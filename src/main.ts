@@ -85,6 +85,127 @@ function bindGlobalEvents() {
   document.getElementById('outcome-close')!.addEventListener('click', () => {
     (document.getElementById('outcome-dialog') as HTMLDialogElement).close();
   });
+  document.getElementById('library-btn')!.addEventListener('click', openLibrary);
+  document.getElementById('library-close')!.addEventListener('click', () => {
+    (document.getElementById('library-dialog') as HTMLDialogElement).close();
+  });
+  document.getElementById('lib-download-all')!.addEventListener('click', downloadLibraryBundle);
+}
+
+// ---- Library ----
+
+type LibraryManifest = {
+  builtAt: string;
+  cases: { file: string; path: string; title: string; kind: string }[];
+  dmPackets: { file: string; path: string }[];
+  specs: { file: string; path: string }[];
+};
+
+let libraryCache: LibraryManifest | null = null;
+
+async function loadLibrary(): Promise<LibraryManifest> {
+  if (libraryCache) return libraryCache;
+  const resp = await fetch('/library.json', { cache: 'no-store' });
+  libraryCache = (await resp.json()) as LibraryManifest;
+  return libraryCache;
+}
+
+async function openLibrary() {
+  const lib = await loadLibrary();
+  const packetsEl = document.getElementById('lib-packets')!;
+  const casesEl = document.getElementById('lib-cases')!;
+  const specsEl = document.getElementById('lib-specs')!;
+
+  // DM packets: try to match a case by basename for the title hint
+  const titleByFile = new Map<string, string>();
+  for (const c of lib.cases) {
+    const base = c.file.replace(/\.ya?ml$/, '');
+    titleByFile.set(`${base}.md`, c.title);
+  }
+
+  packetsEl.innerHTML = lib.dmPackets
+    .map(
+      (p) => `
+      <div class="lib-row">
+        <span class="lib-name">${escape(p.file)}</span>
+        <span class="lib-title">${escape(titleByFile.get(p.file) ?? '')}</span>
+        <span class="lib-actions">
+          <a href="${escape(p.path)}" target="_blank" rel="noopener">view</a>
+          <a href="${escape(p.path)}" download="${escape(p.file)}">download</a>
+        </span>
+      </div>`,
+    )
+    .join('');
+
+  casesEl.innerHTML = lib.cases
+    .map(
+      (c) => `
+      <div class="lib-row">
+        <span class="lib-name">${escape(c.file)}</span>
+        <span class="lib-title">${escape(c.title)}</span>
+        <span class="lib-kind ${escape(c.kind)}">${escape(c.kind)}</span>
+        <span class="lib-actions">
+          <a href="${escape(c.path)}" target="_blank" rel="noopener">view</a>
+          <a href="${escape(c.path)}" download="${escape(c.file)}">download</a>
+        </span>
+      </div>`,
+    )
+    .join('');
+
+  specsEl.innerHTML = lib.specs
+    .map(
+      (s) => `
+      <div class="lib-row">
+        <span class="lib-name">${escape(s.file)}</span>
+        <span class="lib-actions">
+          <a href="${escape(s.path)}" target="_blank" rel="noopener">view</a>
+          <a href="${escape(s.path)}" download="${escape(s.file)}">download</a>
+        </span>
+      </div>`,
+    )
+    .join('');
+
+  const dlg = document.getElementById('library-dialog') as HTMLDialogElement;
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  else dlg.setAttribute('open', '');
+}
+
+async function downloadLibraryBundle() {
+  const lib = await loadLibrary();
+  // Build a single self-contained Markdown document with all cases + packets + specs.
+  // Markdown is the most readable single-file format; opens in any text/markdown viewer.
+  const parts: string[] = [];
+  parts.push('# Fulcrum library — full bundle');
+  parts.push(`Built: ${lib.builtAt}`);
+  parts.push('\nThis is every authored case, DM packet, and spec document concatenated into a single readable file. Section headings let you skim or search.');
+
+  parts.push('\n\n---\n\n# Specs\n');
+  for (const s of lib.specs) {
+    const txt = await (await fetch(s.path)).text();
+    parts.push(`\n\n## spec/${s.file}\n\n${txt}\n`);
+  }
+
+  parts.push('\n\n---\n\n# DM packets\n');
+  for (const p of lib.dmPackets) {
+    const txt = await (await fetch(p.path)).text();
+    parts.push(`\n\n## cases/dm-packets/${p.file}\n\n${txt}\n`);
+  }
+
+  parts.push('\n\n---\n\n# Cases (YAML)\n');
+  for (const c of lib.cases) {
+    const txt = await (await fetch(c.path)).text();
+    parts.push(`\n\n## cases/${c.file}\n\n\`\`\`yaml\n${txt}\n\`\`\`\n`);
+  }
+
+  const blob = new Blob([parts.join('')], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fulcrum-library-${lib.builtAt.slice(0, 10)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function startNewGame() {

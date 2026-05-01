@@ -17,6 +17,7 @@
     <label for="case-select">Case:</label>
     <select id="case-select"></select>
     <button id="new-game" class="btn">New game</button>
+    <button id="library-btn" class="btn btn-quiet">Library</button>
   </div>
   <div class="clocks">
     <div class="clock shift-clock">
@@ -97,6 +98,29 @@
   <div class="dlg-h">Disposition outcome</div>
   <div class="dlg-body" id="outcome-text"></div>
   <div class="dlg-foot"><button id="outcome-close" class="btn">Close</button></div>
+</dialog>
+
+<dialog id="library-dialog" class="dlg-wide">
+  <div class="dlg-h">Library</div>
+  <div class="dlg-body library-body">
+    <p class="dlg-intro">Source files for every authored case, DM packet, and spec doc. Click <em>view</em> to read in a new tab; <em>download</em> saves the raw file. The DM packets are markdown — they read fine as plain text in a browser tab, or open them in any markdown viewer for formatting.</p>
+    <div class="lib-section">
+      <div class="lib-h">DM packets <span class="lib-sub">(read these before voicing the patient)</span></div>
+      <div class="lib-list" id="lib-packets"></div>
+    </div>
+    <div class="lib-section">
+      <div class="lib-h">Cases (YAML data) <span class="lib-sub">(engine-side: vitals, orders, dispo outcomes)</span></div>
+      <div class="lib-list" id="lib-cases"></div>
+    </div>
+    <div class="lib-section">
+      <div class="lib-h">Specs <span class="lib-sub">(rules engine + case-file schema)</span></div>
+      <div class="lib-list" id="lib-specs"></div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button id="lib-download-all" class="btn">Download all (single bundle)</button>
+    <button id="library-close" class="btn">Close</button>
+  </div>
 </dialog>
 
 <script type="module" src="/js/main.js"></script>
