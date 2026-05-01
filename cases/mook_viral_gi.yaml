@@ -1,0 +1,141 @@
+id: mook_viral_gi
+title: "Viral GI: Nausea and Diarrhea"
+version: 1
+kind: mook
+chief_complaint: "Nausea, vomiting, watery diarrhea, ~24 hours"
+demographics:
+  age: 22
+  sex: M
+  pmh: []
+  meds: []
+  allergies: ["NKDA"]
+arrival:
+  room: bay_4
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: viral_gastroenteritis
+    weight: 70
+  - dx: early_appendicitis
+    weight: 25
+  - dx: dka_new_onset
+    weight: 5
+
+vitals_initial:
+  hr: 102
+  sbp: 118
+  dbp: 72
+  rr: 18
+  spo2: 99
+  tempC: 37.5
+
+vitals_trajectory:
+  viral_gastroenteritis:
+    tier_0: { hr_delta: -3, drift_to_tier_1_per_turn: 0.05 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+  early_appendicitis:
+    tier_0: { hr_delta: 2, temp_delta: 0.1, drift_to_tier_1_per_turn: 0.10 }
+    tier_1: { hr_delta: 4, temp_delta: 0.2, drift_to_tier_2_per_turn: 0.10 }
+    tier_2: { drift_to_tier_3_per_turn: 0.10 }
+    tier_3: {}
+  dka_new_onset:
+    tier_0: { hr_delta: 3, rr_delta: 1, drift_to_tier_1_per_turn: 0.20 }
+    tier_1: { hr_delta: 4, rr_delta: 2, sbp_delta: -3, drift_to_tier_2_per_turn: 0.15 }
+    tier_2: { sbp_delta: -8 }
+    tier_3: {}
+
+orders_available:
+  - order_id: bedside_glucose
+    base_minutes: 2
+    result_by_dx:
+      viral_gastroenteritis: { text: "Glucose 88.", data: { glc: 88 } }
+      early_appendicitis: { text: "Glucose 96.", data: { glc: 96 } }
+      dka_new_onset: { text: "Glucose 442. (HIGH)", data: { glc: 442 } }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      viral_gastroenteritis: { text: "WBC 8.0, Hgb 14.6, Plt 240.", data: {} }
+      early_appendicitis: { text: "WBC 13.2 with left shift, Hgb 14.4.", data: {} }
+      dka_new_onset: { text: "WBC 11.6 (stress), Hgb 16 (hemoconcentrated).", data: {} }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      viral_gastroenteritis: { text: "Na 138, K 3.6, Cl 99, HCO₃ 22, Cr 1.0.", data: {} }
+      early_appendicitis: { text: "Na 138, K 3.9, Cl 100, HCO₃ 23, Cr 0.9.", data: {} }
+      dka_new_onset: { text: "Na 132, K 4.6, Cl 95, HCO₃ 8, Cr 1.4. Anion gap 29.", data: { dka: true } }
+  - order_id: lactate
+    base_minutes: 20
+    result_by_dx:
+      viral_gastroenteritis: { text: "Lactate 1.4.", data: {} }
+      early_appendicitis: { text: "Lactate 1.7.", data: {} }
+      dka_new_onset: { text: "Lactate 2.5.", data: {} }
+  - order_id: ua
+    base_minutes: 10
+    result_by_dx:
+      viral_gastroenteritis: { text: "UA: trace ketones, otherwise unremarkable.", data: {} }
+      early_appendicitis: { text: "UA: few WBC, no nitrites, no leuk esterase. (Sterile pyuria from inflamed appendix near ureter.)", data: {} }
+      dka_new_onset: { text: "UA: large ketones, large glucose.", data: { ketones: large, glucose: large } }
+  - order_id: ct_abd_pelv_contrast
+    base_minutes: 60
+    result_by_dx:
+      viral_gastroenteritis: { text: "No acute intra-abdominal pathology. Mild non-specific bowel-wall thickening.", data: {} }
+      early_appendicitis: { text: "Dilated appendix to 9mm with periappendiceal stranding. No abscess.", data: {} }
+      dka_new_onset: { text: "No acute pathology.", data: {} }
+
+history_items:
+  - { id: hpi_onset, label: "Onset and timeline", cost: 1 }
+  - { id: pain_localization, label: "Pain location and migration", cost: 1 }
+  - { id: associated, label: "Fever / anorexia / urinary symptoms", cost: 1 }
+  - { id: exposures, label: "Sick contacts / food / travel", cost: 1 }
+  - { id: thirst, label: "Thirst / urination / weight loss", cost: 1 }
+  - { id: pmh, label: "Past medical history / family DM", cost: 1 }
+  - { id: meds, label: "Current medications", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance / hydration", cost: 1 }
+  - { id: abdomen, label: "Focused abdominal exam (incl. McBurney)", cost: 2 }
+  - { id: skin_mucous, label: "Skin / mucous membranes", cost: 1 }
+  - { id: cardiac, label: "Cardiac exam", cost: 1 }
+
+dispo_outcomes:
+  viral_gastroenteritis:
+    DISCHARGE_HOME:
+      tier_0: "PO trial successful, ondansetron prescription. Resolves over 48h. Excellent UC disposition."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED gives fluids, discharges. Over-utilization."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Resolves. Fine."
+    OBSERVE:
+      tier_0: "IV fluids in your bay; tolerates PO. Discharged. Excellent UC use."
+    REFER_SPECIALIST:
+      tier_0: "Referral overkill. Resolves on its own."
+  early_appendicitis:
+    DISCHARGE_HOME:
+      tier_0: "Returns within 12 hours, focal RLQ pain, perforated appendicitis. Admitted from ED, OR for laparoscopic appendectomy. Recovers — but surgery was more complex than it would have been."
+      tier_1: "Returns within 6 hours with worse pain. Appendectomy. Recovers."
+      tier_2: "Returns by EMS, septic. ICU then OR. Recovers with complications."
+    TRANSFER_ED:
+      tier_0: "Transferred. Appendectomy that evening. Uncomplicated. Was the right call."
+      tier_1: "Transferred urgently. Appendectomy. Uncomplicated."
+    REFER_PCP:
+      tier_0: "Returns within 12 hours. Appendectomy. Recovers with complications."
+    REFER_SPECIALIST:
+      tier_0: "Surgical referral — too slow. Returns by EMS. Appendectomy. Complications."
+    OBSERVE:
+      tier_0: "Pain localizes during observation. Transferred. Appendectomy that evening. Excellent UC catch."
+  dka_new_onset:
+    DISCHARGE_HOME:
+      tier_0: "Returns by EMS within hours, obtunded. ICU admission. Survives with significant complications."
+      tier_1: "Returns within 4 hours. ICU. Survives."
+      tier_2: "Catastrophic. ICU. Survives with complications."
+    TRANSFER_ED:
+      tier_0: "Transferred stably with IV fluids started. ICU admission for DKA. Recovers fully. Excellent UC catch — bedside glucose was the move."
+      tier_1: "Transferred. ICU. Recovers."
+    REFER_PCP:
+      tier_0: "Returns by EMS that day. ICU. Survives with complications."
+    REFER_SPECIALIST:
+      tier_0: "Endocrine referral — too slow. Returns by EMS. ICU. Complications."
+    OBSERVE:
+      tier_0: "IV fluids; insulin if available. Transferred. ICU. Excellent UC bridge."

@@ -1,0 +1,165 @@
+id: mook_low_back_pain
+title: "Low Back Pain"
+version: 1
+kind: mook
+chief_complaint: "Low back pain, 3 days, worse this morning"
+demographics:
+  age: 64
+  sex: M
+  pmh: ["HTN", "Hyperlipidemia", "30 pack-year smoking history"]
+  meds: ["amlodipine", "atorvastatin"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_6
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: mechanical_low_back_pain
+    weight: 65
+  - dx: aaa_with_back_pain
+    weight: 15
+  - dx: cauda_equina
+    weight: 10
+  - dx: vertebral_compression_metastatic
+    weight: 10
+
+vitals_initial:
+  hr: 90
+  sbp: 142
+  dbp: 84
+  rr: 16
+  spo2: 98
+  tempC: 36.8
+
+vitals_trajectory:
+  mechanical_low_back_pain:
+    tier_0: { hr_delta: -2 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+  aaa_with_back_pain:
+    tier_0: { hr_delta: 2, drift_to_tier_1_per_turn: 0.12 }
+    tier_1: { hr_delta: 4, sbp_delta: -3, drift_to_tier_2_per_turn: 0.18 }
+    tier_2: { hr_delta: 6, sbp_delta: -10, drift_to_tier_3_per_turn: 0.30 }
+    tier_3: { sbp_delta: -15 }
+  cauda_equina:
+    tier_0: { drift_to_tier_1_per_turn: 0.08 }
+    tier_1: { drift_to_tier_2_per_turn: 0.05 }
+    tier_2: {}
+    tier_3: {}
+  vertebral_compression_metastatic:
+    tier_0: {}
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+
+orders_available:
+  - order_id: pocus_aorta
+    base_minutes: 15
+    result_by_dx:
+      mechanical_low_back_pain: { text: "Aorta visible to bifurcation; max diameter ~2.0 cm. Normal.", data: { aaa: false } }
+      aaa_with_back_pain: { text: "Infrarenal aorta measures 6.4 cm with intraluminal thrombus. No clear retroperitoneal hematoma seen on POCUS.", data: { aaa: true, size_cm: 6.4 } }
+      cauda_equina: { text: "Aorta normal, ~2.1 cm.", data: { aaa: false } }
+      vertebral_compression_metastatic: { text: "Aorta normal.", data: { aaa: false } }
+  - order_id: ct_abd_pelv_contrast
+    base_minutes: 60
+    result_by_dx:
+      mechanical_low_back_pain: { text: "No acute pathology. Mild degenerative changes lumbar spine.", data: {} }
+      aaa_with_back_pain: { text: "Infrarenal AAA, 6.5 cm, with retroperitoneal stranding suspicious for contained leak.", data: {} }
+      cauda_equina: { text: "Large central disc herniation L4-L5 with severe canal stenosis.", data: {} }
+      vertebral_compression_metastatic: { text: "Lytic lesion T12 with pathologic compression. Multiple lytic lesions throughout.", data: {} }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      mechanical_low_back_pain: { text: "WBC 7.4, Hgb 14.0, Plt 240.", data: {} }
+      aaa_with_back_pain: { text: "WBC 9.8, Hgb 11.2 (below baseline), Plt 220.", data: {} }
+      cauda_equina: { text: "WBC 8.2, Hgb 14.0, Plt 240.", data: {} }
+      vertebral_compression_metastatic: { text: "WBC 7.0, Hgb 9.6 (anemia of chronic disease), Plt 188.", data: {} }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      mechanical_low_back_pain: { text: "Na 139, K 4.0, Cr 1.0.", data: {} }
+      aaa_with_back_pain: { text: "Na 138, K 4.3, Cr 1.2.", data: {} }
+      cauda_equina: { text: "Na 140, K 4.0, Cr 0.9.", data: {} }
+      vertebral_compression_metastatic: { text: "Na 138, K 4.0, Cr 1.0, Ca 11.6 (hypercalcemia).", data: { ca: 11.6 } }
+  - order_id: lactate
+    base_minutes: 20
+    result_by_dx:
+      mechanical_low_back_pain: { text: "Lactate 1.0.", data: {} }
+      aaa_with_back_pain: { text: "Lactate 2.4.", data: {} }
+      cauda_equina: { text: "Lactate 1.0.", data: {} }
+      vertebral_compression_metastatic: { text: "Lactate 1.2.", data: {} }
+  - order_id: ua
+    base_minutes: 10
+    result_by_dx:
+      mechanical_low_back_pain: { text: "UA: unremarkable.", data: {} }
+      aaa_with_back_pain: { text: "UA: unremarkable.", data: {} }
+      cauda_equina: { text: "UA: unremarkable. (Bladder retention if catheterized.)", data: {} }
+      vertebral_compression_metastatic: { text: "UA: unremarkable.", data: {} }
+
+history_items:
+  - { id: hpi_onset, label: "Onset / mechanism / radiation", cost: 1 }
+  - { id: red_flag_neuro, label: "Saddle anesthesia / urinary or bowel changes", cost: 1 }
+  - { id: red_flag_constitutional, label: "Fever / weight loss / night sweats", cost: 1 }
+  - { id: vascular_risk, label: "Vascular risk / syncope / abdominal pain", cost: 1 }
+  - { id: cancer_hx, label: "Prior cancer / family cancer history", cost: 1 }
+  - { id: trauma, label: "Recent trauma", cost: 1 }
+  - { id: meds, label: "Current medications / anticoagulants", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance", cost: 1 }
+  - { id: abdomen, label: "Abdominal exam (incl. pulsatile mass)", cost: 2 }
+  - { id: back, label: "Back exam (palpation, ROM, percussion)", cost: 2 }
+  - { id: neuro_lower, label: "Lower-extremity neuro / saddle / rectal tone", cost: 3 }
+  - { id: vascular, label: "Distal pulses / extremity perfusion", cost: 2 }
+
+dispo_outcomes:
+  mechanical_low_back_pain:
+    DISCHARGE_HOME:
+      tier_0: "NSAIDs, return precautions, PT referral. Resolves over 1-2 weeks. Excellent UC disposition."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED imaging negative. Discharged. Over-utilization."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Resolves. Fine."
+    REFER_SPECIALIST:
+      tier_0: "PT / ortho referral. Resolves. Reasonable."
+    OBSERVE:
+      tier_0: "Discharge after pain control. Reasonable."
+  aaa_with_back_pain:
+    DISCHARGE_HOME:
+      tier_0: "Frank rupture in the parking lot. EMS resuscitation. Does not survive."
+      tier_1: "Decompensates within an hour. EMS resuscitation. Catastrophic outcome."
+      tier_2: "Catastrophic outcome."
+    TRANSFER_ED:
+      tier_0: "Transferred emergently with vascular surgery alert called. Endovascular repair within 90 minutes. Recovers fully. Was the right call — POCUS aorta saved his life."
+      tier_1: "Transferred while compensated. Endovascular repair. Recovers."
+      tier_2: "Transferred while decompensating. Open repair. Survives."
+    REFER_PCP:
+      tier_0: "Catastrophic outcome before follow-up."
+    REFER_SPECIALIST:
+      tier_0: "Catastrophic outcome before follow-up."
+    OBSERVE:
+      tier_0: "POCUS aorta during observation reveals the AAA. You transfer. Endovascular repair. Recovers."
+  cauda_equina:
+    DISCHARGE_HOME:
+      tier_0: "Returns within 24 hours with frank saddle anesthesia and incontinence. Surgical decompression delayed. Permanent deficit."
+      tier_1: "Returns within 12 hours. Decompression. Partial recovery."
+    TRANSFER_ED:
+      tier_0: "Transferred urgently. MRI confirms cauda equina. Decompression that evening. Excellent functional recovery. Was the right call."
+    REFER_PCP:
+      tier_0: "Returns within 24 hours. Decompression delayed. Permanent deficit."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient ortho — too slow. Permanent deficit."
+    OBSERVE:
+      tier_0: "Neuro exam during observation reveals saddle changes. Transferred. Decompression. Excellent UC catch."
+  vertebral_compression_metastatic:
+    DISCHARGE_HOME:
+      tier_0: "Returns within 48 hours with worsening pain. ED imaging reveals lesions. Oncology workup begins. (Earlier identification would not have changed acute outcome but might have avoided an extra ED visit.)"
+    TRANSFER_ED:
+      tier_0: "Transferred. ED imaging confirms lesions. Admitted to oncology. Reasonable."
+    REFER_PCP:
+      tier_0: "PCP follow-up. PCP refers to oncology. Outcome similar."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient referral. Oncology workup begins. Reasonable."
+    OBSERVE:
+      tier_0: "Imaging during observation reveals lesions. Transferred. Admitted. Excellent UC catch."

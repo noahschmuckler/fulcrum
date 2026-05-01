@@ -1,0 +1,147 @@
+id: respiratory_distress_dyspnea
+title: Worsening Dyspnea on Exertion
+version: 1
+kind: complex
+chief_complaint: "Progressive dyspnea over 2 days, worse today"
+demographics:
+  age: 67
+  sex: F
+  pmh: ["HTN", "Breast Ca s/p lumpectomy + tamoxifen 6 mo ago", "Former smoker"]
+  meds: ["amlodipine", "tamoxifen"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_5
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: pulmonary_embolism
+    weight: 50
+  - dx: chf_exacerbation
+    weight: 30
+  - dx: viral_bronchitis
+    weight: 20
+
+vitals_initial:
+  hr: 108
+  sbp: 128
+  dbp: 78
+  rr: 22
+  spo2: 92
+  tempC: 36.9
+
+vitals_trajectory:
+  pulmonary_embolism:
+    tier_0: { hr_delta: 2, spo2_delta: -1, drift_to_tier_1_per_turn: 0.18 }
+    tier_1: { hr_delta: 4, spo2_delta: -2, drift_to_tier_2_per_turn: 0.18 }
+    tier_2: { sbp_delta: -8, spo2_delta: -3, drift_to_tier_3_per_turn: 0.20 }
+    tier_3: { sbp_delta: -10, spo2_delta: -3 }
+  chf_exacerbation:
+    tier_0: { drift_to_tier_1_per_turn: 0.10 }
+    tier_1: { rr_delta: 1, spo2_delta: -1, drift_to_tier_2_per_turn: 0.06 }
+    tier_2: {}
+    tier_3: {}
+  viral_bronchitis:
+    tier_0: { hr_delta: -2, spo2_delta: 1 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+
+orders_available:
+  - order_id: ecg_12_lead
+    base_minutes: 5
+    result_by_dx:
+      pulmonary_embolism: { text: "Sinus tachycardia, rate 110. S1Q3T3 pattern subtle. RV strain pattern.", data: { rv_strain: true } }
+      chf_exacerbation: { text: "Sinus rhythm, rate 88. LVH. No acute changes.", data: {} }
+      viral_bronchitis: { text: "Sinus rhythm, rate 92. No acute changes.", data: {} }
+  - order_id: cxr
+    base_minutes: 25
+    result_by_dx:
+      pulmonary_embolism: { text: "No infiltrate. Mildly enlarged pulmonary artery. Subtle Westermark sign in left upper field.", data: {} }
+      chf_exacerbation: { text: "Cardiomegaly. Bilateral interstitial edema, Kerley B lines, small bilateral effusions.", data: {} }
+      viral_bronchitis: { text: "Mild peribronchial cuffing. No infiltrate or effusion.", data: {} }
+  - order_id: pocus_lung
+    base_minutes: 15
+    result_by_dx:
+      pulmonary_embolism: { text: "A-line pattern bilaterally. Right ventricle appears dilated; LV underfilled.", data: { rv_dilated: true } }
+      chf_exacerbation: { text: "Diffuse B-lines bilaterally. Reduced LV systolic function. IVC plethoric.", data: { b_lines: true } }
+      viral_bronchitis: { text: "Mostly A-lines; rare B-line at right base. No effusion.", data: {} }
+  - order_id: d_dimer
+    base_minutes: 30
+    result_by_dx:
+      pulmonary_embolism: { text: "D-dimer: 4.2 µg/mL FEU (elevated, well above age-adjusted threshold).", data: { ddimer: 4.2 } }
+      chf_exacerbation: { text: "D-dimer: 0.8 µg/mL FEU (mildly elevated).", data: { ddimer: 0.8 } }
+      viral_bronchitis: { text: "D-dimer: 0.3 µg/mL FEU (negative).", data: { ddimer: 0.3 } }
+  - order_id: bnp
+    base_minutes: 30
+    result_by_dx:
+      pulmonary_embolism: { text: "BNP: 280 pg/mL (mildly elevated).", data: { bnp: 280 } }
+      chf_exacerbation: { text: "BNP: 1820 pg/mL.", data: { bnp: 1820 } }
+      viral_bronchitis: { text: "BNP: 60 pg/mL.", data: { bnp: 60 } }
+  - order_id: troponin_initial
+    base_minutes: 30
+    result_by_dx:
+      pulmonary_embolism: { text: "Troponin I: 0.06 ng/mL (mildly elevated, RV strain pattern).", data: { trop: 0.06 } }
+      chf_exacerbation: { text: "Troponin I: 0.02 ng/mL.", data: { trop: 0.02 } }
+      viral_bronchitis: { text: "Troponin I: <0.01 ng/mL.", data: { trop: 0.005 } }
+  - order_id: ct_chest_pe
+    base_minutes: 60
+    result_by_dx:
+      pulmonary_embolism: { text: "Saddle embolus extending into bilateral main pulmonary arteries with right heart strain.", data: { pe: saddle } }
+      chf_exacerbation: { text: "No PE. Bilateral effusions, pulmonary edema.", data: {} }
+      viral_bronchitis: { text: "No PE. Mild bronchial wall thickening.", data: {} }
+
+history_items:
+  - { id: hpi_onset, label: "Onset and progression of dyspnea", cost: 1 }
+  - { id: associated, label: "Chest pain / cough / hemoptysis / leg swelling", cost: 1 }
+  - { id: cancer_hx, label: "Cancer / chemotherapy / hormone therapy history", cost: 1 }
+  - { id: travel, label: "Recent travel / immobilization / surgery", cost: 1 }
+  - { id: orthopnea, label: "Orthopnea / PND / lower-extremity edema", cost: 1 }
+  - { id: smoking, label: "Smoking history", cost: 1 }
+  - { id: meds, label: "Current medications (incl. estrogens)", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance / work of breathing", cost: 1 }
+  - { id: lungs, label: "Pulmonary auscultation", cost: 2 }
+  - { id: cardiac, label: "Cardiac auscultation / JVD", cost: 2 }
+  - { id: extremities, label: "Lower-extremity edema / calf exam", cost: 2 }
+  - { id: skin, label: "Skin / cyanosis", cost: 1 }
+
+dispo_outcomes:
+  pulmonary_embolism:
+    DISCHARGE_HOME:
+      tier_0: "Returns by EMS in 4 hours, hypotensive. Saddle PE confirmed. Receives systemic thrombolysis. Survives, with significant complications."
+      tier_1: "Returns within 90 min, near-syncope. PE confirmed. Thrombolysis. Survives."
+      tier_2: "Cardiac arrest at home. EMS resuscitates. Significant disability."
+    TRANSFER_ED:
+      tier_0: "Transferred stably with anticoagulation initiated and PE alert called. Saddle PE confirmed. Anticoagulation continued; recovers fully. Disposition was the right call."
+      tier_1: "Transferred with notification. PE confirmed. Recovers fully."
+      tier_2: "Transferred while decompensating. Thrombolysis. Recovers fully — timing was tight."
+    REFER_PCP:
+      tier_0: "Returns by EMS that evening. PE confirmed. Survives with complications."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient referral made. Returns by EMS that evening. PE confirmed. Survives with complications."
+    OBSERVE:
+      tier_0: "Observation in your bay; SpO₂ drifts, HR climbs. You transfer. PE confirmed. Recovers fully."
+      tier_1: "Observation while declining; transferred. PE confirmed. Recovers, residual deconditioning."
+  chf_exacerbation:
+    DISCHARGE_HOME:
+      tier_0: "Returns the next morning with worsening dyspnea. Admitted from ED for diuresis. Recovers — a missed-opportunity-for-IV-furosemide visit."
+    TRANSFER_ED:
+      tier_0: "Transferred stably. Diuresed in ED. Admitted overnight. Discharged the next day. Reasonable disposition."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient cardiology referral arranged. Returns next day with worsened dyspnea. ED diuresis. Recovers."
+    REFER_PCP:
+      tier_0: "PCP follow-up tomorrow. Returns sooner with worsened dyspnea. ED diuresis. Recovers."
+    OBSERVE:
+      tier_0: "IV furosemide given in your bay (if ordered). Symptoms improve. Discharged with diuretic adjustment and cardiology follow-up. Excellent UC outcome."
+  viral_bronchitis:
+    DISCHARGE_HOME:
+      tier_0: "Symptomatic care, return precautions. Resolves over 5–7 days. Reasonable."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED workup confirms viral bronchitis. Discharged. Disposition was over-cautious."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Resolves. Fine."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient pulmonology — overkill. Resolves. Fine."
+    OBSERVE:
+      tier_0: "60-min observation; SpO₂ improves. Discharged. Fine."

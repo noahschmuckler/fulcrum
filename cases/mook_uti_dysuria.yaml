@@ -1,0 +1,141 @@
+id: mook_uti_dysuria
+title: "UTI: Dysuria and Urgency"
+version: 1
+kind: mook
+chief_complaint: "Burning with urination, urgency, 2 days"
+demographics:
+  age: 47
+  sex: F
+  pmh: ["Recurrent UTIs (2/year)"]
+  meds: ["loratadine PRN"]
+  allergies: ["sulfa"]
+arrival:
+  room: bay_2
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: uncomplicated_uti
+    weight: 75
+  - dx: pyelonephritis
+    weight: 15
+  - dx: urosepsis_brewing
+    weight: 10
+
+vitals_initial:
+  hr: 96
+  sbp: 122
+  dbp: 76
+  rr: 16
+  spo2: 99
+  tempC: 37.5
+
+vitals_trajectory:
+  uncomplicated_uti:
+    tier_0: { hr_delta: -2 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+  pyelonephritis:
+    tier_0: { hr_delta: 2, temp_delta: 0.2, drift_to_tier_1_per_turn: 0.08 }
+    tier_1: { hr_delta: 4, drift_to_tier_2_per_turn: 0.05 }
+    tier_2: {}
+    tier_3: {}
+  urosepsis_brewing:
+    tier_0: { hr_delta: 4, temp_delta: 0.3, drift_to_tier_1_per_turn: 0.20 }
+    tier_1: { hr_delta: 6, sbp_delta: -4, drift_to_tier_2_per_turn: 0.20 }
+    tier_2: { sbp_delta: -10, drift_to_tier_3_per_turn: 0.20 }
+    tier_3: { sbp_delta: -10 }
+
+orders_available:
+  - order_id: ua
+    base_minutes: 10
+    result_by_dx:
+      uncomplicated_uti: { text: "UA: 2+ leuk esterase, 2+ nitrites, many WBC, few bacteria.", data: { ua_positive: true } }
+      pyelonephritis: { text: "UA: 3+ leuk esterase, 3+ nitrites, many WBC, many bacteria, WBC casts.", data: { wbc_casts: true } }
+      urosepsis_brewing: { text: "UA: 3+ leuk esterase, 3+ nitrites, many WBC, many bacteria.", data: {} }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      uncomplicated_uti: { text: "WBC 9.0. Otherwise unremarkable.", data: { wbc: 9.0 } }
+      pyelonephritis: { text: "WBC 14.6 with left shift.", data: { wbc: 14.6 } }
+      urosepsis_brewing: { text: "WBC 17.4 with bandemia.", data: { wbc: 17.4, bands: true } }
+  - order_id: lactate
+    base_minutes: 20
+    result_by_dx:
+      uncomplicated_uti: { text: "Lactate: 1.1.", data: { lactate: 1.1 } }
+      pyelonephritis: { text: "Lactate: 1.8.", data: { lactate: 1.8 } }
+      urosepsis_brewing: { text: "Lactate: 3.1.", data: { lactate: 3.1 } }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      uncomplicated_uti: { text: "Na 138, K 4.0, Cr 0.8.", data: {} }
+      pyelonephritis: { text: "Na 136, K 4.1, Cr 1.0.", data: {} }
+      urosepsis_brewing: { text: "Na 134, K 4.4, Cr 1.4 (above baseline).", data: { aki: true } }
+  - order_id: blood_culture
+    base_minutes: 60
+    result_by_dx:
+      uncomplicated_uti: { text: "Blood cultures pending (24-48h).", data: {} }
+      pyelonephritis: { text: "Blood cultures pending (24-48h).", data: {} }
+      urosepsis_brewing: { text: "Blood cultures pending (24-48h).", data: {} }
+  - order_id: pocus_kidney
+    base_minutes: 15
+    result_by_dx:
+      uncomplicated_uti: { text: "No hydronephrosis. No stones visible.", data: {} }
+      pyelonephritis: { text: "Mild right hydronephrosis. No stone visualized.", data: {} }
+      urosepsis_brewing: { text: "Right hydronephrosis. Possible 6mm UVJ stone.", data: { obstructing_stone: true } }
+
+history_items:
+  - { id: hpi_onset, label: "Onset / dysuria timeline", cost: 1 }
+  - { id: flank_pain, label: "Flank or back pain / CVA tenderness", cost: 1 }
+  - { id: associated, label: "Fever / chills / N/V", cost: 1 }
+  - { id: prior_uti, label: "Prior UTI history / recent antibiotics", cost: 1 }
+  - { id: pmh, label: "Diabetes / immunosuppression / pregnancy", cost: 1 }
+  - { id: stones_hx, label: "Prior kidney stones", cost: 1 }
+  - { id: meds, label: "Current meds / allergies", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance", cost: 1 }
+  - { id: abdomen, label: "Abdominal exam", cost: 2 }
+  - { id: cva, label: "CVA tenderness", cost: 1 }
+  - { id: cardiac, label: "Cardiac exam", cost: 1 }
+
+dispo_outcomes:
+  uncomplicated_uti:
+    DISCHARGE_HOME:
+      tier_0: "Empiric nitrofurantoin (sulfa allergic). Resolves over 3-5 days. Excellent UC disposition."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED treats and discharges. Over-utilization."
+    REFER_PCP:
+      tier_0: "PCP follow-up tomorrow with prescription. Resolves. Reasonable but slow."
+    REFER_SPECIALIST:
+      tier_0: "Urology referral — overkill. Fine."
+    OBSERVE:
+      tier_0: "Symptomatic improvement after PO ABX dose. Discharged. Reasonable."
+  pyelonephritis:
+    DISCHARGE_HOME:
+      tier_0: "Returns within 48h, worsened with vomiting. Admitted from ED for IV antibiotics. Recovers."
+    TRANSFER_ED:
+      tier_0: "Transferred. Admitted from ED for IV antibiotics. Recovers."
+    REFER_PCP:
+      tier_0: "Returns within 48h, worsened. Admitted from ED. Recovers."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient urology — too slow. Returns to ED next day. Admitted. Recovers."
+    OBSERVE:
+      tier_0: "First IV ceftriaxone dose; she tolerates. Transferred to ED for admission. Excellent UC bridge."
+      tier_1: "IV antibiotics + fluids; HR softens. Transferred. Admitted. Recovers."
+  urosepsis_brewing:
+    DISCHARGE_HOME:
+      tier_0: "Returns by EMS in hours, hypotensive and septic. Obstructing stone identified. ICU admission, urology decompression. Survives with significant complications."
+      tier_1: "Returns within 4 hours, hypotensive. Admitted ICU. Survives."
+      tier_2: "Catastrophic. EMS resuscitation. ICU. Survives with complications."
+    TRANSFER_ED:
+      tier_0: "Transferred stably with sepsis bundle started. ED confirms obstructing stone with hydro; urology decompression same day. Recovers fully. Was the right call."
+      tier_1: "Transferred urgently. Decompression same day. Recovers."
+      tier_2: "Transferred while decompensating. ICU. Recovers — timing was tight."
+    REFER_PCP:
+      tier_0: "Returns by EMS within hours. Septic shock. Survives with complications."
+    REFER_SPECIALIST:
+      tier_0: "Returns by EMS that evening. Septic shock. Survives with complications."
+    OBSERVE:
+      tier_0: "IV antibiotics + fluids started. Vitals trend; you transfer. Decompression same day. Recovers — excellent UC bridge."
+      tier_1: "IV resuscitation; transferred while improving. Recovers."

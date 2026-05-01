@@ -1,0 +1,149 @@
+id: chest_pain_palpitations
+title: Chest Pain and Palpitations
+version: 1
+kind: complex
+chief_complaint: "Sudden palpitations and chest tightness, 90 min onset"
+demographics:
+  age: 54
+  sex: F
+  pmh: ["HTN (lisinopril)"]
+  meds: ["lisinopril"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_3
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: afib_with_nstemi
+    weight: 65
+  - dx: afib_alone
+    weight: 35
+
+vitals_initial:
+  hr: 162
+  sbp: 118
+  dbp: 74
+  rr: 18
+  spo2: 97
+  tempC: 36.8
+
+vitals_trajectory:
+  afib_with_nstemi:
+    tier_0:
+      hr_delta: -2
+      drift_to_tier_1_per_turn: 0.18
+    tier_1:
+      hr_delta: -8
+      sbp_delta: -3
+      drift_to_tier_2_per_turn: 0.12
+    tier_2:
+      hr_delta: -4
+      sbp_delta: -8
+      drift_to_tier_3_per_turn: 0.20
+    tier_3:
+      sbp_delta: -12
+      spo2_delta: -2
+  afib_alone:
+    tier_0:
+      hr_delta: -3
+      drift_to_tier_1_per_turn: 0.05
+    tier_1:
+      hr_delta: -10
+      drift_to_tier_2_per_turn: 0.02
+    tier_2: {}
+    tier_3: {}
+
+orders_available:
+  - order_id: ecg_12_lead
+    base_minutes: 5
+    result_by_dx:
+      afib_with_nstemi:
+        text: "Atrial fibrillation, RVR ~160. ST depressions in II, III, aVF; subtle ST elevation reciprocal in aVL."
+        data: { rhythm: afib_rvr, rate: 160, st_changes: true }
+      afib_alone:
+        text: "Atrial fibrillation, RVR ~160. No acute ST-T changes."
+        data: { rhythm: afib_rvr, rate: 160, st_changes: false }
+  - order_id: troponin_initial
+    base_minutes: 30
+    result_by_dx:
+      afib_with_nstemi:
+        text: "Troponin I: 0.04 ng/mL — borderline. Single timepoint."
+        data: { trop: 0.04 }
+      afib_alone:
+        text: "Troponin I: <0.01 ng/mL (negative)."
+        data: { trop: 0.005 }
+  - order_id: troponin_repeat
+    base_minutes: 90
+    after_order: troponin_initial
+    result_by_dx:
+      afib_with_nstemi:
+        text: "Troponin I (2-hour delta): 0.18 ng/mL — rising, positive delta."
+        data: { trop: 0.18, delta: positive }
+      afib_alone:
+        text: "Troponin I (repeat): <0.01 ng/mL — flat."
+        data: { trop: 0.005 }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      afib_with_nstemi: { text: "WBC 8.4, Hgb 13.2, Plt 248.", data: { wbc: 8.4, hgb: 13.2 } }
+      afib_alone:      { text: "WBC 7.9, Hgb 13.5, Plt 232.", data: { wbc: 7.9, hgb: 13.5 } }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      afib_with_nstemi: { text: "Na 138, K 3.6, Cr 0.9, Mg 1.8.", data: { k: 3.6, mg: 1.8 } }
+      afib_alone:      { text: "Na 139, K 4.0, Cr 0.8, Mg 2.0.", data: { k: 4.0, mg: 2.0 } }
+  - order_id: cxr
+    base_minutes: 25
+    result_by_dx:
+      afib_with_nstemi: { text: "No acute infiltrate. Mild cardiomegaly. No effusion.", data: { acute: false } }
+      afib_alone:      { text: "Clear. No infiltrate or effusion.", data: { acute: false } }
+
+history_items:
+  - { id: hpi_onset, label: "Onset and timing", cost: 1 }
+  - { id: hpi_quality, label: "Pain quality and radiation", cost: 1 }
+  - { id: hpi_associated, label: "Associated symptoms (SOB, diaphoresis, nausea)", cost: 1 }
+  - { id: hpi_triggers, label: "Triggers / exertion", cost: 1 }
+  - { id: pmh_cardiac, label: "Prior cardiac history", cost: 1 }
+  - { id: meds, label: "Current medications", cost: 1 }
+  - { id: family_hx, label: "Family cardiac history", cost: 1 }
+  - { id: social_hx, label: "Tobacco / EtOH / drugs / caffeine", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance", cost: 1 }
+  - { id: cardiac, label: "Cardiac auscultation", cost: 2 }
+  - { id: lungs, label: "Pulmonary exam", cost: 2 }
+  - { id: vascular, label: "Peripheral pulses + extremities", cost: 2 }
+  - { id: neuro, label: "Focused neuro", cost: 2 }
+
+dispo_outcomes:
+  afib_with_nstemi:
+    DISCHARGE_HOME:
+      tier_0: "She presents to the ED that evening with worsening chest pain. A posterior NSTEMI is identified; she undergoes catheterization the next morning. Recovers fully. The cardiologist's note references the earlier ST changes."
+      tier_1: "She returns by EMS within 4 hours. Posterior NSTEMI confirmed. Cath same day. Recovers fully — but time-to-cath was longer than ideal."
+      tier_2: "She arrests in the parking lot. ROSC achieved by EMS. Survives with mild anoxic injury."
+      tier_3: "Catastrophic outcome. The family asks to review the visit."
+    TRANSFER_ED:
+      tier_0: "Transferred stably. Posterior NSTEMI identified on repeat ECG and rising troponin. Cath the next morning. Recovers fully. Your clinical instinct was sound."
+      tier_1: "Transferred stably. Posterior NSTEMI. Cath same day. Recovers fully."
+      tier_2: "Transferred urgently. Cath within 2 hours. Recovers fully. Timing was tight."
+      tier_3: "Transferred while crashing. Catheterization on arrival. Survives."
+    REFER_PCP:
+      tier_0: "She follows up the next day with her PCP — but presents to the ED that night with acute chest pain. NSTEMI confirmed. She does well, but the visit-to-cath delay is noted."
+      tier_1: "She returns by EMS that same evening. NSTEMI confirmed. Recovers fully."
+      tier_2: "She decompensates en route home. EMS activated. Survives, with an anoxic injury."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient cardiology arranged. She presents to the ED that night with acute chest pain. NSTEMI confirmed. Recovers fully."
+    OBSERVE:
+      tier_0: "Continued monitoring in your bay. ST changes evolve over the next hour; you ultimately transfer. NSTEMI confirmed. Recovers fully."
+      tier_1: "Continued monitoring; she becomes hypotensive. EMS activated. Recovers fully after cath."
+  afib_alone:
+    DISCHARGE_HOME:
+      tier_0: "Outpatient cardiology arranged. Rate-controlled on a beta-blocker; anticoagulation initiated. She does well. (Was a careful disposition for new AFib.)"
+    TRANSFER_ED:
+      tier_0: "Admitted for telemetry. Rate-controlled; anticoagulation initiated; outpatient cardiology arranged. Discharged the next day. (Disposition was reasonable but ED was likely not strictly necessary.)"
+    REFER_PCP:
+      tier_0: "PCP follow-up tomorrow. Her PCP refers her to cardiology that day. She is rate-controlled and anticoagulated outpatient. Does well."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient cardiology within 48h. Rate-controlled; anticoagulation initiated. Does well. A reasonable disposition."
+    OBSERVE:
+      tier_0: "Continued monitoring. Spontaneously converts to sinus rhythm at the 3-hour mark. You transfer for cardioversion confirmation and anticoagulation initiation; she does well."

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fulcrum</title>
+<link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">⏷</span>
+    <span class="brand-name">Fulcrum</span>
+    <span class="brand-tag">UC sim</span>
+  </div>
+  <div class="case-pick">
+    <label for="case-select">Case:</label>
+    <select id="case-select"></select>
+    <button id="new-game" class="btn">New game</button>
+  </div>
+  <div class="clocks">
+    <div class="clock shift-clock">
+      <span class="lbl">Shift</span>
+      <span class="val" id="shift-clock">00:00</span>
+    </div>
+    <div class="clock turn-timer">
+      <span class="lbl">Turn</span>
+      <span class="val" id="turn-timer">90</span>
+    </div>
+    <button id="pause-btn" class="btn pause-btn">Pause</button>
+  </div>
+</header>
+
+<main class="grid">
+  <section class="floor-plan card">
+    <div class="card-h">Floor</div>
+    <svg id="floor-svg" viewBox="0 0 600 480" preserveAspectRatio="xMidYMid meet" aria-label="Floor plan"></svg>
+    <div class="legend">
+      <span class="dot dot-stable"></span> stable
+      <span class="dot dot-drift"></span> drifting
+      <span class="dot dot-deteriorating"></span> deteriorating
+      <span class="dot dot-critical"></span> critical
+    </div>
+  </section>
+
+  <section class="room-view card">
+    <div class="card-h" id="room-title">No room selected</div>
+    <div id="room-empty" class="empty-state">Click a patient room on the floor to enter.</div>
+    <div id="room-body" hidden>
+      <div class="patient-head">
+        <div class="patient-meta">
+          <div class="patient-name" id="patient-name"></div>
+          <div class="patient-cc" id="patient-cc"></div>
+        </div>
+        <div class="manifest">
+          <div class="manifest-label">Manifest</div>
+          <div class="manifest-bar"><div class="manifest-fill" id="manifest-fill"></div></div>
+        </div>
+      </div>
+      <div class="vitals" id="vitals-box"></div>
+      <div class="budget">
+        <div class="budget-label">Time in room: <span id="budget-units"></span> units</div>
+        <div class="budget-bar"><div class="budget-fill" id="budget-fill"></div></div>
+      </div>
+      <div class="action-tabs">
+        <button class="tab active" data-tab="history">History</button>
+        <button class="tab" data-tab="exam">Exam</button>
+        <button class="tab" data-tab="orders">Orders</button>
+        <button class="tab" data-tab="meds">Meds</button>
+        <button class="tab" data-tab="dispo">Dispo</button>
+      </div>
+      <div class="tab-pane" id="pane-history"></div>
+      <div class="tab-pane" id="pane-exam" hidden></div>
+      <div class="tab-pane" id="pane-orders" hidden></div>
+      <div class="tab-pane" id="pane-meds" hidden></div>
+      <div class="tab-pane" id="pane-dispo" hidden></div>
+      <div class="room-foot">
+        <button id="exit-room" class="btn btn-quiet">Leave room (end turn)</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="inbox card">
+    <div class="card-h">Results inbox</div>
+    <div class="results-list" id="results-list"></div>
+    <div class="card-h sub-h">Pending</div>
+    <div class="pending-list" id="pending-list"></div>
+  </section>
+
+  <section class="log card">
+    <div class="card-h">Cues + log</div>
+    <div class="cues-list" id="cues-list"></div>
+  </section>
+</main>
+
+<dialog id="outcome-dialog">
+  <div class="dlg-h">Disposition outcome</div>
+  <div class="dlg-body" id="outcome-text"></div>
+  <div class="dlg-foot"><button id="outcome-close" class="btn">Close</button></div>
+</dialog>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>

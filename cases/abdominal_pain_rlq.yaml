@@ -1,0 +1,140 @@
+id: abdominal_pain_rlq
+title: Abdominal Pain in a Reproductive-Age Woman
+version: 1
+kind: complex
+chief_complaint: "RLQ pain, several hours, LMP ~6 weeks ago"
+demographics:
+  age: 28
+  sex: F
+  pmh: []
+  meds: ["multivitamin"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_2
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: ectopic_pregnancy
+    weight: 50
+  - dx: hemorrhagic_ovarian_cyst
+    weight: 30
+  - dx: functional_pain
+    weight: 20
+
+vitals_initial:
+  hr: 96
+  sbp: 112
+  dbp: 70
+  rr: 16
+  spo2: 99
+  tempC: 36.9
+
+vitals_trajectory:
+  ectopic_pregnancy:
+    tier_0: { hr_delta: 4, drift_to_tier_1_per_turn: 0.20 }
+    tier_1: { hr_delta: 6, sbp_delta: -3, drift_to_tier_2_per_turn: 0.18 }
+    tier_2: { hr_delta: 6, sbp_delta: -8, drift_to_tier_3_per_turn: 0.25 }
+    tier_3: { sbp_delta: -10, hr_delta: 4 }
+  hemorrhagic_ovarian_cyst:
+    tier_0: { drift_to_tier_1_per_turn: 0.06 }
+    tier_1: { hr_delta: 2, drift_to_tier_2_per_turn: 0.04 }
+    tier_2: {}
+    tier_3: {}
+  functional_pain:
+    tier_0: { hr_delta: -2 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+
+orders_available:
+  - order_id: urine_hcg
+    base_minutes: 10
+    result_by_dx:
+      ectopic_pregnancy: { text: "Urine hCG: POSITIVE.", data: { hcg: positive } }
+      hemorrhagic_ovarian_cyst: { text: "Urine hCG: negative.", data: { hcg: negative } }
+      functional_pain: { text: "Urine hCG: negative.", data: { hcg: negative } }
+  - order_id: pocus_pelvic
+    base_minutes: 15
+    result_by_dx:
+      ectopic_pregnancy: { text: "No intrauterine pregnancy. Trace anechoic free fluid in cul-de-sac. Right adnexal complex mass measuring ~2.5 cm.", data: { iup: false, free_fluid: true } }
+      hemorrhagic_ovarian_cyst: { text: "Normal IUP not seen (early); right adnexal cyst ~3 cm with internal echoes; small free fluid.", data: { iup: false, free_fluid: true } }
+      functional_pain: { text: "Limited transabdominal study; no obvious pathology. No free fluid.", data: { free_fluid: false } }
+  - order_id: pocus_fast
+    base_minutes: 10
+    result_by_dx:
+      ectopic_pregnancy: { text: "FAST: trace fluid in Morison's pouch.", data: { morisons: true } }
+      hemorrhagic_ovarian_cyst: { text: "FAST: negative.", data: { morisons: false } }
+      functional_pain: { text: "FAST: negative.", data: { morisons: false } }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      ectopic_pregnancy: { text: "WBC 11.2, Hgb 10.4, Plt 240.", data: { hgb: 10.4 } }
+      hemorrhagic_ovarian_cyst: { text: "WBC 9.8, Hgb 12.1, Plt 268.", data: { hgb: 12.1 } }
+      functional_pain: { text: "WBC 7.4, Hgb 13.0, Plt 258.", data: { hgb: 13.0 } }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      ectopic_pregnancy: { text: "Na 138, K 3.9, Cr 0.7. Normal.", data: {} }
+      hemorrhagic_ovarian_cyst: { text: "Na 139, K 4.1, Cr 0.8. Normal.", data: {} }
+      functional_pain: { text: "Na 140, K 4.0, Cr 0.7. Normal.", data: {} }
+  - order_id: ct_abd_pelv_contrast
+    base_minutes: 60
+    result_by_dx:
+      ectopic_pregnancy: { text: "Right adnexal mass with surrounding fluid; findings concerning for tubal ectopic with hemoperitoneum.", data: {} }
+      hemorrhagic_ovarian_cyst: { text: "Right ovarian cyst with surrounding fluid, consistent with hemorrhagic cyst.", data: {} }
+      functional_pain: { text: "No acute intra-abdominal pathology.", data: {} }
+
+history_items:
+  - { id: hpi_onset, label: "Onset and timing of pain", cost: 1 }
+  - { id: hpi_quality, label: "Pain quality / radiation", cost: 1 }
+  - { id: lmp, label: "Last menstrual period", cost: 1 }
+  - { id: sexual_hx, label: "Sexual history / contraception", cost: 1 }
+  - { id: gyn_hx, label: "Prior gynecologic / pregnancy history", cost: 1 }
+  - { id: associated, label: "Associated symptoms (N/V, dizziness, vaginal bleeding)", cost: 1 }
+  - { id: pmh, label: "Past medical / surgical history", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance", cost: 1 }
+  - { id: abdomen, label: "Focused abdominal exam", cost: 2 }
+  - { id: pelvic, label: "Bimanual / speculum exam", cost: 3 }
+  - { id: vascular, label: "Pulses / orthostatics", cost: 2 }
+
+dispo_outcomes:
+  ectopic_pregnancy:
+    DISCHARGE_HOME:
+      tier_0: "She returns by EMS within 6 hours, hypotensive. Ruptured tubal ectopic confirmed. Receives transfusion; laparoscopic salpingectomy. Survives. Significant complication; root-cause review opened."
+      tier_1: "She returns within 2 hours, near-syncope. Ruptured ectopic. Salpingectomy. Survives."
+      tier_2: "Catastrophic. EMS resuscitates and transports. OR within 30 min. Survives with significant blood loss."
+    TRANSFER_ED:
+      tier_0: "Transferred stably. Formal TVUS confirms tubal ectopic. Salpingectomy that evening. Recovers fully. Disposition was the right call."
+      tier_1: "Transferred urgently with IV access and notification. OR within 90 min. Recovers fully."
+      tier_2: "Transferred while crashing. OR on arrival. Recovers fully — timing was tight."
+    REFER_PCP:
+      tier_0: "Returns by EMS that evening. Ruptured ectopic. Salpingectomy. Survives."
+    REFER_SPECIALIST:
+      tier_0: "OB referral arranged for tomorrow. Returns by EMS that evening with ruptured ectopic. Salpingectomy. Survives."
+    OBSERVE:
+      tier_0: "Continued monitoring; HR climbs and free fluid increases on repeat POCUS. You transfer. Salpingectomy that evening. Recovers fully."
+      tier_1: "Continued monitoring while pre-syncopal — you escalate to EMS. Salpingectomy same evening. Recovers fully."
+  hemorrhagic_ovarian_cyst:
+    DISCHARGE_HOME:
+      tier_0: "Pain controlled with NSAIDs and outpatient OB follow-up. Resolves over 48h. Reasonable disposition once ectopic was excluded."
+    TRANSFER_ED:
+      tier_0: "Transferred. OB consult confirms hemorrhagic cyst; observation only; discharged from ED. Disposition was over-cautious but defensible."
+    OBSERVE:
+      tier_0: "Pain improves over 90 min. Outpatient OB follow-up arranged. Reasonable."
+    REFER_PCP:
+      tier_0: "PCP follow-up tomorrow. Pain resolves. Outpatient OB referral added later."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient OB within 48h. Pain resolves. Reasonable."
+  functional_pain:
+    DISCHARGE_HOME:
+      tier_0: "Pain resolves before discharge paperwork. Returns to baseline. Reasonable disposition once serious causes were excluded."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED workup negative. Discharged from ED. Disposition was over-cautious."
+    OBSERVE:
+      tier_0: "Pain resolves over 60 min. Discharged. Fine."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Pain resolves. Fine."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient GYN. Pain resolves. Fine."

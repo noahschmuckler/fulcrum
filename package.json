@@ -1,0 +1,19 @@
+{
+  "name": "fulcrum",
+  "version": "0.1.0",
+  "description": "Tabletop urgent-care guideline-development simulator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch & npx wrangler pages dev public",
+    "deploy": "node scripts/build.mjs && npx wrangler pages deploy public --project-name fulcrum",
+    "build:cases": "node scripts/build-cases.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^3.80.0"
+  }
+}

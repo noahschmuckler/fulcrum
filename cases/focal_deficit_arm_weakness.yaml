@@ -1,0 +1,135 @@
+id: focal_deficit_arm_weakness
+title: Sudden Right Arm Weakness
+version: 1
+kind: complex
+chief_complaint: "Sudden right-arm weakness, 75 minutes ago"
+demographics:
+  age: 64
+  sex: M
+  pmh: ["HTN", "T2DM", "Hyperlipidemia"]
+  meds: ["lisinopril", "metformin", "atorvastatin"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_4
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: ischemic_stroke_lvo
+    weight: 50
+  - dx: bell_palsy_with_radial_compression
+    weight: 20
+  - dx: migraine_with_aura
+    weight: 30
+
+vitals_initial:
+  hr: 84
+  sbp: 168
+  dbp: 92
+  rr: 16
+  spo2: 97
+  tempC: 36.7
+
+vitals_trajectory:
+  ischemic_stroke_lvo:
+    tier_0: { drift_to_tier_1_per_turn: 0.10 }
+    tier_1: { sbp_delta: 4, drift_to_tier_2_per_turn: 0.10 }
+    tier_2: { sbp_delta: 6, drift_to_tier_3_per_turn: 0.10 }
+    tier_3: {}
+  bell_palsy_with_radial_compression:
+    tier_0: {}
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+  migraine_with_aura:
+    tier_0: { hr_delta: -2 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+
+orders_available:
+  - order_id: bedside_glucose
+    base_minutes: 2
+    result_by_dx:
+      ischemic_stroke_lvo: { text: "Glucose 142.", data: { glc: 142 } }
+      bell_palsy_with_radial_compression: { text: "Glucose 138.", data: { glc: 138 } }
+      migraine_with_aura: { text: "Glucose 96.", data: { glc: 96 } }
+  - order_id: ct_head_noncon
+    base_minutes: 30
+    result_by_dx:
+      ischemic_stroke_lvo: { text: "No acute hemorrhage. Hyperdense MCA sign on the left. No mass effect yet.", data: { hemorrhage: false, lvo_signs: true } }
+      bell_palsy_with_radial_compression: { text: "No acute findings.", data: { hemorrhage: false, lvo_signs: false } }
+      migraine_with_aura: { text: "No acute findings.", data: { hemorrhage: false, lvo_signs: false } }
+  - order_id: ecg_12_lead
+    base_minutes: 5
+    result_by_dx:
+      ischemic_stroke_lvo: { text: "Atrial fibrillation, rate ~80. (Possible cardioembolic source.)", data: { rhythm: afib } }
+      bell_palsy_with_radial_compression: { text: "NSR, rate 76.", data: { rhythm: nsr } }
+      migraine_with_aura: { text: "NSR, rate 70.", data: { rhythm: nsr } }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      ischemic_stroke_lvo: { text: "WBC 9.1, Hgb 13.6, Plt 220.", data: {} }
+      bell_palsy_with_radial_compression: { text: "WBC 7.8, Hgb 13.4, Plt 218.", data: {} }
+      migraine_with_aura: { text: "WBC 6.9, Hgb 14.0, Plt 240.", data: {} }
+  - order_id: bmp
+    base_minutes: 30
+    result_by_dx:
+      ischemic_stroke_lvo: { text: "Na 139, K 4.0, Cr 1.0, Glucose 144.", data: {} }
+      bell_palsy_with_radial_compression: { text: "Na 140, K 4.1, Cr 0.9, Glucose 138.", data: {} }
+      migraine_with_aura: { text: "Na 141, K 4.1, Cr 0.8, Glucose 96.", data: {} }
+
+history_items:
+  - { id: hpi_onset, label: "Exact time last known well", cost: 1 }
+  - { id: hpi_progression, label: "Symptom progression / max severity", cost: 1 }
+  - { id: associated, label: "Associated symptoms (HA, vision, speech)", cost: 1 }
+  - { id: prior_episodes, label: "Prior similar episodes / TIA history", cost: 1 }
+  - { id: pmh_vasc, label: "Vascular risk factors / AFib", cost: 1 }
+  - { id: meds, label: "Anticoagulant or antiplatelet use", cost: 1 }
+  - { id: trauma, label: "Recent trauma / sleep posture", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance", cost: 1 }
+  - { id: cn_facial, label: "Cranial nerves / facial", cost: 2 }
+  - { id: motor_arms, label: "Motor — upper extremities (drift, strength)", cost: 2 }
+  - { id: motor_legs, label: "Motor — lower extremities", cost: 2 }
+  - { id: sensory, label: "Sensory exam", cost: 2 }
+  - { id: speech, label: "Speech / language", cost: 2 }
+  - { id: cardiac, label: "Cardiac auscultation", cost: 1 }
+
+dispo_outcomes:
+  ischemic_stroke_lvo:
+    DISCHARGE_HOME:
+      tier_0: "He returns by EMS in 90 minutes with dense hemiparesis. Beyond TPA window. Significant disability."
+      tier_1: "Returns within an hour with worsening deficits. Catastrophic."
+    TRANSFER_ED:
+      tier_0: "Transferred emergently with stroke alert called ahead. CTA confirms LVO. Thrombectomy within the standard window. Excellent recovery."
+      tier_1: "Transferred. Thrombectomy. Recovers with mild residual weakness."
+      tier_2: "Transferred while declining. Thrombectomy outside the ideal window. Moderate residual deficit."
+    REFER_PCP:
+      tier_0: "Returns by EMS within hours. Beyond window. Significant disability."
+    REFER_SPECIALIST:
+      tier_0: "Returns by EMS that evening. Beyond window. Significant disability."
+    OBSERVE:
+      tier_0: "Continued in-bay observation. Symptoms progress over 30 minutes; you transfer. Outside window. Moderate disability."
+  bell_palsy_with_radial_compression:
+    DISCHARGE_HOME:
+      tier_0: "Outpatient neurology follow-up; the radial compression sleep palsy resolves over days. Bell's palsy starts improving on prednisone within a week. Reasonable disposition once stroke was excluded."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED workup excludes stroke. Discharged. Reasonable but unnecessary if UC was confident."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient neurology arranged. Recovers as expected."
+    OBSERVE:
+      tier_0: "Symptoms unchanged at 60 min; deficit clearly non-vascular pattern. Discharged with neurology follow-up."
+    REFER_PCP:
+      tier_0: "PCP follow-up next day. PCP refers to neurology. Recovers as expected."
+  migraine_with_aura:
+    DISCHARGE_HOME:
+      tier_0: "Aura resolves within 90 minutes; HA follows but is manageable. Outpatient follow-up. Reasonable disposition once stroke was excluded."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED imaging negative. Treated for migraine and discharged. Disposition was reasonable but defensive."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Migraine confirmed. Reasonable."
+    REFER_SPECIALIST:
+      tier_0: "Outpatient neurology. Migraine confirmed. Reasonable."
+    OBSERVE:
+      tier_0: "Aura resolves. HA peaks then improves. Discharged."

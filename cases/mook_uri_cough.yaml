@@ -1,0 +1,115 @@
+id: mook_uri_cough
+title: "URI: Cough and Sore Throat"
+version: 1
+kind: mook
+chief_complaint: "Cough and sore throat for 4 days"
+demographics:
+  age: 38
+  sex: M
+  pmh: ["Mild asthma (rare albuterol use)"]
+  meds: ["albuterol PRN"]
+  allergies: ["NKDA"]
+arrival:
+  room: bay_1
+  arrival_turn: 0
+
+hidden_dx_draw:
+  - dx: viral_uri
+    weight: 80
+  - dx: bacterial_pneumonia
+    weight: 20
+
+vitals_initial:
+  hr: 92
+  sbp: 124
+  dbp: 78
+  rr: 18
+  spo2: 96
+  tempC: 37.8
+
+vitals_trajectory:
+  viral_uri:
+    tier_0: { hr_delta: -2, temp_delta: -0.1 }
+    tier_1: {}
+    tier_2: {}
+    tier_3: {}
+  bacterial_pneumonia:
+    tier_0: { hr_delta: 2, temp_delta: 0.1, drift_to_tier_1_per_turn: 0.10 }
+    tier_1: { hr_delta: 4, spo2_delta: -1, drift_to_tier_2_per_turn: 0.10 }
+    tier_2: { spo2_delta: -2, drift_to_tier_3_per_turn: 0.10 }
+    tier_3: {}
+
+orders_available:
+  - order_id: cxr
+    base_minutes: 25
+    result_by_dx:
+      viral_uri: { text: "No infiltrate. No effusion.", data: { acute: false } }
+      bacterial_pneumonia: { text: "Right lower lobe consolidation. No effusion.", data: { rll_consolidation: true } }
+  - order_id: influenza_pcr
+    base_minutes: 30
+    result_by_dx:
+      viral_uri: { text: "Influenza A: positive.", data: { flu_a: positive } }
+      bacterial_pneumonia: { text: "Influenza A/B: negative.", data: {} }
+  - order_id: covid_pcr
+    base_minutes: 30
+    result_by_dx:
+      viral_uri: { text: "SARS-CoV-2: negative.", data: {} }
+      bacterial_pneumonia: { text: "SARS-CoV-2: negative.", data: {} }
+  - order_id: strep_rapid
+    base_minutes: 10
+    result_by_dx:
+      viral_uri: { text: "Strep rapid: negative.", data: {} }
+      bacterial_pneumonia: { text: "Strep rapid: negative.", data: {} }
+  - order_id: cbc
+    base_minutes: 30
+    result_by_dx:
+      viral_uri: { text: "WBC 8.6 with lymphocyte predominance. Hgb 14.2.", data: {} }
+      bacterial_pneumonia: { text: "WBC 14.8 with left shift. Hgb 14.0.", data: {} }
+  - order_id: lactate
+    base_minutes: 20
+    result_by_dx:
+      viral_uri: { text: "Lactate: 1.0.", data: { lactate: 1.0 } }
+      bacterial_pneumonia: { text: "Lactate: 2.3.", data: { lactate: 2.3 } }
+
+history_items:
+  - { id: hpi_onset, label: "Onset and timeline", cost: 1 }
+  - { id: associated, label: "Fever / chills / SOB / pleuritic pain", cost: 1 }
+  - { id: sputum, label: "Cough characteristics / sputum", cost: 1 }
+  - { id: exposures, label: "Sick contacts / exposures", cost: 1 }
+  - { id: pmh, label: "Asthma / COPD / immunosuppression", cost: 1 }
+  - { id: meds, label: "Current medications", cost: 1 }
+  - { id: vaccinations, label: "Flu / COVID / pneumococcal vaccination", cost: 1 }
+
+exam_regions:
+  - { id: general, label: "General appearance / hydration", cost: 1 }
+  - { id: heent, label: "HEENT (throat, ears, sinuses)", cost: 1 }
+  - { id: lungs, label: "Pulmonary auscultation", cost: 2 }
+  - { id: cardiac, label: "Cardiac exam", cost: 1 }
+
+dispo_outcomes:
+  viral_uri:
+    DISCHARGE_HOME:
+      tier_0: "Symptomatic care, fluids, return precautions. Resolves over 5 days. Reasonable disposition."
+    TRANSFER_ED:
+      tier_0: "Transferred. ED confirms viral URI. Discharged. Over-utilization."
+    REFER_PCP:
+      tier_0: "PCP follow-up. Resolves. Fine."
+    REFER_SPECIALIST:
+      tier_0: "Pulmonology referral — overkill. Fine."
+    OBSERVE:
+      tier_0: "Vitals stable. Discharged. Over-cautious for a viral URI."
+  bacterial_pneumonia:
+    DISCHARGE_HOME:
+      tier_0: "Returns by EMS in 24 hours, hypoxic and septic. Admitted from ED to ICU. Survives. Significant complication."
+      tier_1: "Returns within 8 hours, worsened. Admitted from ED. Recovers."
+      tier_2: "Decompensates at home. EMS resuscitates. ICU admission. Survives with complications."
+    TRANSFER_ED:
+      tier_0: "Transferred stably. CAP confirmed; admitted on IV antibiotics. Recovers. Was the right call given vital-sign trend."
+      tier_1: "Transferred. Admitted. Recovers."
+    REFER_PCP:
+      tier_0: "Returns within hours, worsened. Admitted from ED. Recovers."
+    REFER_SPECIALIST:
+      tier_0: "Returns by EMS that evening, hypoxic. Admitted. Recovers with complications."
+    OBSERVE:
+      tier_0: "Initial dose of IV ceftriaxone given (if ordered); transferred for admission. Recovers. Excellent UC bridge."
+      tier_1: "Observed; vitals trend down. Transferred. Recovers."
