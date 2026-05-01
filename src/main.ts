@@ -32,6 +32,7 @@ const startup = async () => {
   cases = payload.cases;
   populateCaseSelect();
   bindGlobalEvents();
+  setupResizeGutters();
   // Auto-start with the first case so the demo lands on something playable.
   const firstId = Object.keys(cases)[0];
   if (firstId) {
@@ -168,6 +169,114 @@ async function openLibrary() {
   const dlg = document.getElementById('library-dialog') as HTMLDialogElement;
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
+}
+
+// ---- Resize gutters (meridian-os-borrowed bubble visual, gutter mechanic) ----
+
+const LAYOUT_KEY = 'fulcrum.layout.v1';
+type LayoutKey = 'floor' | 'room' | 'right' | 'inbox' | 'log';
+
+function setupResizeGutters() {
+  restoreLayout();
+  document.querySelectorAll<HTMLDivElement>('.gutter').forEach((g) => {
+    g.addEventListener('pointerdown', (e) => startGutterDrag(g, e));
+  });
+}
+
+function restoreLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? '{}') as Record<string, number>;
+    for (const [k, v] of Object.entries(saved)) {
+      if (typeof v === 'number' && isFinite(v) && v > 0) {
+        document.documentElement.style.setProperty(`--flex-${k}`, String(v));
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function saveLayout() {
+  const rec: Record<string, number> = {};
+  for (const k of ['floor', 'room', 'right', 'inbox', 'log'] as LayoutKey[]) {
+    const v = document.documentElement.style.getPropertyValue(`--flex-${k}`).trim();
+    if (v) {
+      const n = parseFloat(v);
+      if (isFinite(n) && n > 0) rec[k] = n;
+    }
+  }
+  localStorage.setItem(LAYOUT_KEY, JSON.stringify(rec));
+}
+
+function startGutterDrag(g: HTMLDivElement, e: PointerEvent) {
+  e.preventDefault();
+  const axis: 'v' | 'h' = g.classList.contains('gutter-v') ? 'v' : 'h';
+  const handle = g.dataset.handle ?? '';
+  const pair = paneRefsForHandle(handle);
+  if (!pair) return;
+  const [left, right] = pair;
+  const lr = left.el.getBoundingClientRect();
+  const rr = right.el.getBoundingClientRect();
+  const lSize = axis === 'v' ? lr.width : lr.height;
+  const rSize = axis === 'v' ? rr.width : rr.height;
+  const startPos = axis === 'v' ? e.clientX : e.clientY;
+  const minPx = 120;
+
+  g.classList.add('is-active');
+  try {
+    g.setPointerCapture(e.pointerId);
+  } catch {
+    /* ignore */
+  }
+
+  const onMove = (ev: PointerEvent) => {
+    const cur = axis === 'v' ? ev.clientX : ev.clientY;
+    const delta = cur - startPos;
+    const total = lSize + rSize;
+    const newL = Math.max(minPx, Math.min(total - minPx, lSize + delta));
+    const newR = total - newL;
+    document.documentElement.style.setProperty(`--flex-${left.key}`, String(newL));
+    document.documentElement.style.setProperty(`--flex-${right.key}`, String(newR));
+  };
+
+  const onUp = () => {
+    g.classList.remove('is-active');
+    g.removeEventListener('pointermove', onMove);
+    g.removeEventListener('pointerup', onUp);
+    g.removeEventListener('pointercancel', onUp);
+    saveLayout();
+  };
+
+  g.addEventListener('pointermove', onMove);
+  g.addEventListener('pointerup', onUp);
+  g.addEventListener('pointercancel', onUp);
+}
+
+function paneRefsForHandle(
+  handle: string,
+): [{ el: HTMLElement; key: LayoutKey }, { el: HTMLElement; key: LayoutKey }] | null {
+  const q = (sel: string) => document.querySelector(sel) as HTMLElement | null;
+  switch (handle) {
+    case 'floor-room': {
+      const a = q('.floor-plan');
+      const b = q('.room-view');
+      if (!a || !b) return null;
+      return [{ el: a, key: 'floor' }, { el: b, key: 'room' }];
+    }
+    case 'room-right': {
+      const a = q('.room-view');
+      const b = q('.right-stack');
+      if (!a || !b) return null;
+      return [{ el: a, key: 'room' }, { el: b, key: 'right' }];
+    }
+    case 'inbox-log': {
+      const a = q('.right-stack .inbox');
+      const b = q('.right-stack .log');
+      if (!a || !b) return null;
+      return [{ el: a, key: 'inbox' }, { el: b, key: 'log' }];
+    }
+  }
+  return null;
 }
 
 async function downloadLibraryBundle() {
