@@ -20,7 +20,7 @@ export type Patient = {
   id: string;
   caseRef: string;
   hiddenDx: string;
-  manifestTier: number; // 0 = stable, 1 = drifting, 2 = deteriorating, 3 = critical
+  acuityTier: number; // 0 = stable, 1 = drifting, 2 = deteriorating, 3 = critical
   vitalsCurrent: Vitals;
   room: string;
   arrivedTurn: number;

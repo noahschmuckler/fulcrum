@@ -19,6 +19,7 @@ export type EngineEvent =
   | { kind: 'give_med'; medId: string }
   | { kind: 'commit_dispo'; dispo: Disposition }
   | { kind: 'exit_room' }
+  | { kind: 'end_turn' }
   | { kind: 'toggle_pause' }
   | { kind: 'load_case'; caseFile: CaseFile; seed: number };
 
@@ -52,7 +53,7 @@ export function newGame(caseFile: CaseFile, seed: number): EngineResult {
     id: 'p1',
     caseRef: caseFile.id,
     hiddenDx: draw.dx,
-    manifestTier: 0,
+    acuityTier: 0,
     vitalsCurrent: { ...caseFile.vitals_initial },
     room: caseFile.arrival.room,
     arrivedTurn: 0,
@@ -108,6 +109,13 @@ export function applyEvent(
   }
 
   if (state.paused) {
+    return { state, cues, outcomes };
+  }
+
+  if (ev.kind === 'end_turn') {
+    log(state, state.activePatientId, 'END_TURN');
+    advanceTurn(state, caseFile, rng, cues);
+    state.rngCursor = rng.cursor();
     return { state, cues, outcomes };
   }
 
@@ -184,37 +192,42 @@ export function applyEvent(
     }
     case 'commit_dispo': {
       patient.dispoCommitted = ev.dispo;
-      const outcomeText = pickOutcome(caseFile, patient.hiddenDx, ev.dispo, patient.manifestTier);
+      const outcomeText = pickOutcome(caseFile, patient.hiddenDx, ev.dispo, patient.acuityTier);
       patient.outcomeText = outcomeText;
       outcomes.push(outcomeText);
       log(state, patient.id, 'COMMIT_DISPO', ev.dispo);
-      endTurn(state, caseFile, rng, cues);
+      // Dispo: clear focus AND advance time (patient leaves the bay).
+      state.activeRoom = null;
+      state.activePatientId = null;
+      advanceTurn(state, caseFile, rng, cues);
       state.rngCursor = rng.cursor();
       return { state, cues, outcomes };
     }
     case 'exit_room': {
       log(state, patient.id, 'EXIT_ROOM');
-      endTurn(state, caseFile, rng, cues);
+      // Just leave the room; do NOT advance time.
+      state.activeRoom = null;
+      state.activePatientId = null;
       state.rngCursor = rng.cursor();
       return { state, cues, outcomes };
     }
   }
 
-  // After any in-room action, check budget exhaustion → forced exit
+  // Budget exhausted: emit a cue but DO NOT auto-eject. The DM hits End turn explicitly.
   if (state.withinTurnBudget <= 0) {
     cues.push({ kind: 'budget_exhausted', patientId: patient.id });
-    endTurn(state, caseFile, rng, cues);
   }
 
   state.rngCursor = rng.cursor();
   return { state, cues, outcomes };
 }
 
-function endTurn(state: GameState, caseFile: CaseFile, rng: Rng, cues: DmCue[]): void {
-  state.activeRoom = null;
-  state.activePatientId = null;
+// advanceTurn advances time, ticks vitals, resolves orders, refreshes budget.
+// It does NOT clear activeRoom or activePatientId — caller decides whether to.
+function advanceTurn(state: GameState, caseFile: CaseFile, rng: Rng, cues: DmCue[]): void {
   state.shiftClockMin += state.defaults.turnTickMinutes;
   state.turnIx += 1;
+  state.withinTurnBudget = state.defaults.withinTurnBudgetMax;
 
   // Resolve pending orders whose resolvesTurn <= turnIx
   const stillPending: PendingOrder[] = [];
@@ -248,12 +261,12 @@ function endTurn(state: GameState, caseFile: CaseFile, rng: Rng, cues: DmCue[]):
   }
   state.pendingOrders = stillPending;
 
-  // Tick patients: advance manifest tier per drift probabilities and update vitals
+  // Tick patients: advance acuity tier per drift probabilities and update vitals
   for (const patient of state.patients) {
     if (patient.dispoCommitted) continue;
     const trajByTier = caseFile.vitals_trajectory[patient.hiddenDx];
     if (!trajByTier) continue;
-    const tierKey = `tier_${patient.manifestTier}`;
+    const tierKey = `tier_${patient.acuityTier}`;
     const trajectory = trajByTier[tierKey];
     if (!trajectory) continue;
 
@@ -261,12 +274,12 @@ function endTurn(state: GameState, caseFile: CaseFile, rng: Rng, cues: DmCue[]):
     applyVitalDeltas(patient.vitalsCurrent, trajectory);
 
     // Probabilistic drift to next tier
-    const driftKey = `drift_to_tier_${patient.manifestTier + 1}_per_turn` as const;
+    const driftKey = `drift_to_tier_${patient.acuityTier + 1}_per_turn` as const;
     const driftP = (trajectory as Record<string, number | undefined>)[driftKey];
     if (driftP && rng.chance(driftP)) {
-      const from = patient.manifestTier;
-      patient.manifestTier = Math.min(3, patient.manifestTier + 1);
-      cues.push({ kind: 'tier_change', patientId: patient.id, from, to: patient.manifestTier });
+      const from = patient.acuityTier;
+      patient.acuityTier = Math.min(3, patient.acuityTier + 1);
+      cues.push({ kind: 'tier_change', patientId: patient.id, from, to: patient.acuityTier });
     }
   }
 }

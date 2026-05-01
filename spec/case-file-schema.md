@@ -34,7 +34,7 @@ vitals_initial:
   spo2: 97
   tempC: 36.8
 
-vitals_trajectory:                  # per-dx, per-manifest-tier
+vitals_trajectory:                  # per-dx, per-acuity-tier
   afib_with_nstemi:
     tier_0:
       hr_delta: 0
@@ -134,7 +134,7 @@ exam_regions:                        # what the player can examine; DM voices fi
     label: "Peripheral vascular / pulses"
     cost: 2
 
-dispo_outcomes:                       # outcome text by (hidden_dx, dispo, manifest_tier)
+dispo_outcomes:                       # outcome text by (hidden_dx, dispo, acuity_tier)
   afib_with_nstemi:
     DISCHARGE_HOME:
       tier_0: "She presents to the ED that evening with worsening chest pain. Posterior NSTEMI identified; cath next morning. Recovers fully. The cardiologist's note references your earlier ST changes."

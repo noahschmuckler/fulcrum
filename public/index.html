@@ -28,7 +28,9 @@
       <span class="lbl">Turn</span>
       <span class="val" id="turn-timer">90</span>
     </div>
+    <button id="end-turn-btn" class="btn btn-primary">End turn</button>
     <button id="pause-btn" class="btn pause-btn">Pause</button>
+    <button id="open-player-view" class="btn btn-quiet" title="Open the player-facing window for screensharing">Player view ↗</button>
   </div>
 </header>
 
@@ -54,9 +56,9 @@
           <div class="patient-name" id="patient-name"></div>
           <div class="patient-cc" id="patient-cc"></div>
         </div>
-        <div class="manifest">
-          <div class="manifest-label">Manifest</div>
-          <div class="manifest-bar"><div class="manifest-fill" id="manifest-fill"></div></div>
+        <div class="acuity">
+          <div class="acuity-label" id="acuity-label">Tier 0 · stable</div>
+          <div class="acuity-bar"><div class="acuity-fill" id="acuity-fill"></div></div>
         </div>
       </div>
       <div class="vitals" id="vitals-box"></div>
@@ -77,7 +79,7 @@
       <div class="tab-pane" id="pane-meds" hidden></div>
       <div class="tab-pane" id="pane-dispo" hidden></div>
       <div class="room-foot">
-        <button id="exit-room" class="btn btn-quiet">Leave room (end turn)</button>
+        <button id="exit-room" class="btn btn-quiet">Leave room</button>
       </div>
     </div>
   </section>
@@ -104,6 +106,16 @@
   <div class="dlg-body" id="outcome-text"></div>
   <div class="dlg-foot"><button id="outcome-close" class="btn">Close</button></div>
 </dialog>
+
+<aside id="dm-brief" class="dm-brief" hidden aria-label="DM brief">
+  <div class="dm-brief-h">
+    <span class="dm-brief-title">DM brief</span>
+    <span class="dm-brief-tag">hidden from players</span>
+    <button id="close-dm-brief" class="btn btn-quiet">Close</button>
+  </div>
+  <div class="dm-brief-body" id="dm-brief-body"></div>
+</aside>
+<button id="open-dm-brief" class="dm-brief-toggle" title="Show the hidden truth + pre-revealed results" hidden>DM brief</button>
 
 <dialog id="library-dialog" class="dlg-wide">
   <div class="dlg-h">Library</div>

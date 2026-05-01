@@ -37,7 +37,7 @@ type Patient = {
   id: string;
   caseRef: string;          // points into loaded case files
   hiddenDx: string;          // drawn at creation; never displayed
-  manifestTier: number;      // 0 = stable, 1 = drifting, 2 = deteriorating, 3 = critical
+  acuityTier: number;      // 0 = stable, 1 = drifting, 2 = deteriorating, 3 = critical
   vitalsCurrent: Vitals;     // refreshed on each shift-clock tick from trajectory
   room: string;              // location id (e.g., "bay_3", "waiting_room", "radiology")
   arrivedTurn: number;
@@ -79,40 +79,51 @@ Player actions emitted by the UI, consumed by the engine:
 | `PLACE_ORDER(orderId)` | 1 | Adds to `pendingOrders` with `resolvesTurn` computed from base time + current facility load. Increments facility load for that resource. |
 | `GIVE_MED(orderId)` | 1 | Same as order but for treatment (IV fluids, ondansetron, etc.). May immediately affect deterioration tier. |
 | `COMMIT_DISPO(dispo)` | 0 (ends the turn) | Records dispo, ends turn, resolves outcome. |
-| `EXIT_ROOM` | 0 (ends the turn without dispo) | Player left the room without committing — patient stays in the bay. |
-| `END_TURN` | n/a | Triggered when budget reaches zero or commit/exit fires. Advances `shiftClockMin` by one tick (default 5 min). |
+| `EXIT_ROOM` | 0 | Clear active focus. Does NOT advance time. |
+| `END_TURN` | n/a | Explicit DM-fired event (topbar button). Advances `shiftClockMin` by one tick, ticks vitals, resolves orders, refreshes within-turn budget, resets wall-clock turn timer. Does NOT change `activeRoom`. |
 
 The avatar may not enter a different room in the same turn it entered one; entering = one turn.
 
 ## 4. Turn loop
 
+Time advances on **explicit DM action only** (END_TURN or COMMIT_DISPO). Entering and leaving a room are free actions. Budget exhaustion does NOT auto-end the turn — it just disables further in-room actions until the DM hits End turn.
+
 ```
-while not all patients dispositioned and shift not over:
-  wait for ENTER_ROOM(roomId)
-  set activeRoom, reset withinTurnBudget
-  loop within room:
-    receive ASK_HISTORY | EXAM_REGION | PLACE_ORDER | GIVE_MED | COMMIT_DISPO | EXIT_ROOM
-    deduct cost from withinTurnBudget (if applicable)
-    if budget <= 0: force EXIT_ROOM
-  on COMMIT_DISPO or EXIT_ROOM:
-    advance shiftClockMin by tickMinutes (default 5)
-    for each patient: tick vitals, advance manifest tier per trajectory + triggers
-    resolve any pendingOrders whose resolvesTurn <= turnIx
-    decrement facility load queues
-    snapshot state
-    increment turnIx
-    pass turn to next player (UI concern, not engine)
+loop:
+  receive event
+  switch event:
+    ENTER_ROOM(roomId, patientId):
+      set activeRoom, reset withinTurnBudget
+      (no time advance)
+    ASK_HISTORY | EXAM_REGION | PLACE_ORDER | GIVE_MED:
+      deduct cost from withinTurnBudget (if applicable)
+      if budget <= 0: emit budget_exhausted cue (no auto-eject)
+    EXIT_ROOM:
+      clear activeRoom (no time advance)
+    END_TURN:
+      advanceTurn():
+        shiftClockMin += tickMinutes
+        for each patient: tick vitals, advance acuity tier per trajectory
+        resolve pendingOrders whose resolvesTurn <= turnIx
+        decrement facility load queues
+        refresh withinTurnBudget
+        snapshot state
+        reset wall-clock turn timer
+    COMMIT_DISPO(dispo):
+      record outcome
+      clear activeRoom + activePatientId (patient leaves bay)
+      advanceTurn() (same as above)
 ```
 
 ## 5. Deterioration model
 
-Each patient has a **manifest tier** (0–3) tracked by the engine and a hidden true diagnosis drawn at patient creation from the case file's `hidden_dx_draw`. The trajectory advances based on:
+Each patient has a **acuity tier** (0–3) tracked by the engine and a hidden true diagnosis drawn at patient creation from the case file's `hidden_dx_draw`. The trajectory advances based on:
 
 - **Time-only triggers** — every N turns, advance tier with probability P (per-dx in case file).
 - **Action triggers** — certain actions (or omissions) advance tier or hold it. Examples: not giving fluids to dehydrated patient → advance; placing CT order on the AAA-disguised-as-back-pain → no effect; giving NSAID to GI-bleed-as-dyspepsia → advance.
 - **Treatment triggers** — correct meds hold or de-escalate the tier (e.g., IV fluids for the sepsis-disguised-as-UTI patient → hold at tier 1).
 
-Manifest tier drives the visible health bar and the vital trajectory the engine samples from. The hidden dx is never displayed; the bar tracks **manifest** state, which the player sees in vitals + DM-voiced findings.
+Manifest tier drives the visible health bar and the vital trajectory the engine samples from. The hidden dx is never displayed; the bar tracks **acuity** state, which the player sees in vitals + DM-voiced findings.
 
 ## 6. RNG and snapshots
 
@@ -126,13 +137,13 @@ A snapshot is the `GameState` object plus the action log. Snapshots are taken at
 
 `COMMIT_DISPO` accepts one of:
 
-- `DISCHARGE_HOME` — patient leaves the bay; outcome resolved against hidden dx + manifest tier (case-file-defined; e.g., DC of sepsis-as-UTI at tier 0 → "patient returned 24h later in shock" terminal text)
+- `DISCHARGE_HOME` — patient leaves the bay; outcome resolved against hidden dx + acuity tier (case-file-defined; e.g., DC of sepsis-as-UTI at tier 0 → "patient returned 24h later in shock" terminal text)
 - `TRANSFER_ED` — patient leaves the bay; outcome usually positive when warranted, neutral when not warranted (consumes EMS, no penalty for over-transferring beyond the meta meter)
 - `REFER_PCP` — outpatient PCP follow-up; outcome similar to discharge
 - `REFER_SPECIALIST` — outpatient specialty follow-up
 - `OBSERVE` — patient stays in the bay for another N ticks; not a terminal dispo
 
-Each dispo references a `dispo_outcomes` table in the case file keyed by `(hidden_dx, manifest_tier)`.
+Each dispo references a `dispo_outcomes` table in the case file keyed by `(hidden_dx, acuity_tier)`.
 
 ## 8. Facility load model
 

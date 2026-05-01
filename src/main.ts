@@ -15,6 +15,15 @@ const TURN_SECONDS = 90;
 
 // ---- App state ----
 
+type Role = 'dm' | 'player';
+const ROLE: Role = (() => {
+  const p = new URLSearchParams(location.search).get('role');
+  return p === 'player' ? 'player' : 'dm';
+})();
+const SYNC_CHANNEL_NAME = 'fulcrum-sync';
+const channel: BroadcastChannel | null =
+  typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(SYNC_CHANNEL_NAME) : null;
+
 let cases: Record<string, CaseFile> = {};
 let currentCaseId: string | null = null;
 let state: GameState | null = null;
@@ -23,23 +32,30 @@ let dmCues: { tag: string; text: string; turn: number }[] = [];
 let turnTimerHandle: number | null = null;
 let turnSecondsRemaining = TURN_SECONDS;
 let activeTab: 'history' | 'exam' | 'orders' | 'meds' | 'dispo' = 'history';
+let dmBriefOpen = false;
 
 // ---- Bootstrap ----
 
 const startup = async () => {
+  document.body.classList.add(`role-${ROLE}`);
   const resp = await fetch('/cases.json', { cache: 'no-store' });
   const payload = (await resp.json()) as CasesPayload;
   cases = payload.cases;
   populateCaseSelect();
   bindGlobalEvents();
   setupResizeGutters();
-  // Auto-start with the first case so the demo lands on something playable.
-  const firstId = Object.keys(cases)[0];
-  if (firstId) {
-    currentCaseId = firstId;
-    (document.getElementById('case-select') as HTMLSelectElement).value = firstId;
-    startNewGame();
+  setupSyncChannel();
+  if (ROLE === 'dm') {
+    document.getElementById('open-dm-brief')!.hidden = false;
+    // Auto-start with the first case so the demo lands on something playable.
+    const firstId = Object.keys(cases)[0];
+    if (firstId) {
+      currentCaseId = firstId;
+      (document.getElementById('case-select') as HTMLSelectElement).value = firstId;
+      startNewGame();
+    }
   }
+  // Player window stays empty until DM broadcasts a state.
 };
 startup().catch((err) => {
   console.error(err);
@@ -70,6 +86,21 @@ function populateCaseSelect() {
 function bindGlobalEvents() {
   document.getElementById('new-game')!.addEventListener('click', startNewGame);
   document.getElementById('pause-btn')!.addEventListener('click', togglePause);
+  document.getElementById('end-turn-btn')!.addEventListener('click', () => dispatch({ kind: 'end_turn' }));
+  document.getElementById('open-player-view')!.addEventListener('click', () => {
+    window.open('/?role=player', 'fulcrum-player', 'noopener');
+  });
+  document.getElementById('open-dm-brief')!.addEventListener('click', () => {
+    dmBriefOpen = true;
+    document.getElementById('dm-brief')!.hidden = false;
+    document.getElementById('open-dm-brief')!.hidden = true;
+    renderDmBrief();
+  });
+  document.getElementById('close-dm-brief')!.addEventListener('click', () => {
+    dmBriefOpen = false;
+    document.getElementById('dm-brief')!.hidden = true;
+    if (ROLE === 'dm') document.getElementById('open-dm-brief')!.hidden = false;
+  });
   document.getElementById('exit-room')!.addEventListener('click', () => dispatch({ kind: 'exit_room' }));
   document.querySelectorAll<HTMLButtonElement>('.tab').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -169,6 +200,154 @@ async function openLibrary() {
   const dlg = document.getElementById('library-dialog') as HTMLDialogElement;
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
+}
+
+// ---- Two-window sync (BroadcastChannel) ----
+
+type SyncMessage =
+  | { kind: 'state-update'; caseId: string; state: GameState; turnSecondsRemaining: number; cues: typeof dmCues }
+  | { kind: 'request-state' };
+
+function setupSyncChannel() {
+  if (!channel) return;
+  channel.onmessage = (ev: MessageEvent<SyncMessage>) => {
+    const msg = ev.data;
+    if (!msg) return;
+    if (msg.kind === 'state-update' && ROLE === 'player') {
+      currentCaseId = msg.caseId;
+      state = msg.state;
+      dmCues = msg.cues;
+      turnSecondsRemaining = msg.turnSecondsRemaining;
+      renderAll();
+    } else if (msg.kind === 'request-state' && ROLE === 'dm') {
+      broadcastState();
+    }
+  };
+  if (ROLE === 'player') {
+    // Ask the DM window to send us current state immediately
+    channel.postMessage({ kind: 'request-state' } satisfies SyncMessage);
+  }
+}
+
+function broadcastState() {
+  if (!channel || ROLE !== 'dm' || !state || !currentCaseId) return;
+  channel.postMessage({
+    kind: 'state-update',
+    caseId: currentCaseId,
+    state,
+    turnSecondsRemaining,
+    cues: dmCues,
+  } satisfies SyncMessage);
+}
+
+// ---- DM brief (reveal panel: hidden truth, trajectory, pre-revealed results, dispo previews) ----
+
+function renderDmBrief() {
+  if (!state || !currentCaseId) return;
+  const caseFile = cases[currentCaseId];
+  if (!caseFile) return;
+  const body = document.getElementById('dm-brief-body')!;
+  const patient = state.patients[0]!;
+  const dx = patient.hiddenDx;
+
+  const drawWeights = caseFile.hidden_dx_draw;
+  const totalWeight = drawWeights.reduce((s, d) => s + d.weight, 0);
+  const drawn = drawWeights.find((d) => d.dx === dx);
+  const drawWeight = drawn ? drawn.weight : 0;
+  const drawPct = totalWeight > 0 ? Math.round((drawWeight / totalWeight) * 100) : 0;
+
+  // Trajectory rendering
+  const trajByTier = caseFile.vitals_trajectory[dx] ?? {};
+  const trajRows = [0, 1, 2, 3]
+    .map((t) => {
+      const traj = trajByTier[`tier_${t}`];
+      if (!traj) return '';
+      const deltas: string[] = [];
+      const t2 = traj as Record<string, number | undefined>;
+      if (t2.hr_delta) deltas.push(`HR Δ${signed(t2.hr_delta)}`);
+      if (t2.sbp_delta) deltas.push(`SBP Δ${signed(t2.sbp_delta)}`);
+      if (t2.dbp_delta) deltas.push(`DBP Δ${signed(t2.dbp_delta)}`);
+      if (t2.rr_delta) deltas.push(`RR Δ${signed(t2.rr_delta)}`);
+      if (t2.spo2_delta) deltas.push(`SpO₂ Δ${signed(t2.spo2_delta)}`);
+      if (t2.temp_delta) deltas.push(`Temp Δ${signed(t2.temp_delta)}`);
+      const driftKey = `drift_to_tier_${t + 1}_per_turn`;
+      const driftP = t2[driftKey];
+      const drift = driftP ? `<span class="drift">→ tier ${t + 1}: ${Math.round(driftP * 100)}%/turn</span>` : '';
+      const cur = t === patient.acuityTier ? ' current' : '';
+      return `<div class="dm-tier-row${cur}">
+        <span class="dm-tier-name">Tier ${t}</span>
+        <span class="dm-tier-detail">${deltas.length ? deltas.join(' · ') : '<em>steady</em>'} ${drift}</span>
+      </div>`;
+    })
+    .join('');
+
+  // Pending order pre-reveals
+  const pendingHtml = state.pendingOrders.length === 0
+    ? '<div class="dm-order-row" style="color:#8a6b3a">No pending orders.</div>'
+    : state.pendingOrders
+        .map((p) => {
+          const cat = caseFile.orders_available.find((o) => o.order_id === p.orderId);
+          const result = cat?.result_by_dx[dx];
+          return `<div class="dm-order-row">
+            <div class="dm-order-name">${escape(prettyOrder(p.orderId))}</div>
+            <div class="dm-order-meta">resolves turn ${p.resolvesTurn} (in ${p.resolvesTurn - state!.turnIx} turns)</div>
+            <div class="dm-order-result">${result ? escape(result.text) : '<em>no result authored for this dx</em>'}</div>
+          </div>`;
+        })
+        .join('');
+
+  // All available orders that haven't been placed — preview their results too
+  const unplacedHtml = caseFile.orders_available
+    .filter((o) => !patient.ordersPlaced.includes(o.order_id))
+    .map((o) => {
+      const result = o.result_by_dx[dx];
+      return `<div class="dm-order-row">
+        <div class="dm-order-name">${escape(prettyOrder(o.order_id))} <span class="dm-order-meta">(if ordered)</span></div>
+        <div class="dm-order-result">${result ? escape(result.text) : '<em>no result authored for this dx</em>'}</div>
+      </div>`;
+    })
+    .join('');
+
+  // Dispo outcomes preview for current tier
+  const dispoOutcomes = caseFile.dispo_outcomes[dx] ?? {};
+  const dispoHtml = Object.entries(dispoOutcomes)
+    .map(([dispo, byTier]) => {
+      const text = byTier[`tier_${patient.acuityTier}`] ?? Object.values(byTier)[0] ?? '';
+      return `<div class="dm-dispo-row">
+        <div class="dm-dispo-name">${escape(dispo)} <span class="dm-dispo-tier">at tier ${patient.acuityTier}</span></div>
+        <div class="dm-dispo-text">${escape(text)}</div>
+      </div>`;
+    })
+    .join('');
+
+  body.innerHTML = `
+    <div class="dm-section">
+      <div class="dm-section-h">Hidden truth</div>
+      <div class="dm-truth">${escape(dx)}
+        <div class="dm-truth-meta">rolled at start · weight ${drawWeight} / ${totalWeight} (${drawPct}%)</div>
+      </div>
+    </div>
+    <div class="dm-section">
+      <div class="dm-section-h">Acuity trajectory (current tier ${patient.acuityTier})</div>
+      ${trajRows || '<div style="color:#8a6b3a"><em>no trajectory authored</em></div>'}
+    </div>
+    <div class="dm-section">
+      <div class="dm-section-h">Pending orders — pre-revealed</div>
+      ${pendingHtml}
+    </div>
+    <div class="dm-section">
+      <div class="dm-section-h">Other available orders — what each would return</div>
+      ${unplacedHtml || '<div style="color:#8a6b3a">All available orders already placed.</div>'}
+    </div>
+    <div class="dm-section">
+      <div class="dm-section-h">Dispo outcomes — preview at current tier</div>
+      ${dispoHtml || '<div style="color:#8a6b3a"><em>no outcomes authored</em></div>'}
+    </div>
+  `;
+}
+
+function signed(n: number): string {
+  return n >= 0 ? `+${n}` : `${n}`;
 }
 
 // ---- Resize gutters (meridian-os-borrowed bubble visual, gutter mechanic) ----
@@ -318,6 +497,7 @@ async function downloadLibraryBundle() {
 }
 
 function startNewGame() {
+  if (ROLE !== 'dm') return;
   if (!currentCaseId) return;
   const caseFile = cases[currentCaseId];
   if (!caseFile) return;
@@ -330,11 +510,13 @@ function startNewGame() {
   pushCues(result.cues);
   resetTurnTimer();
   renderAll();
+  broadcastState();
 }
 
 // ---- Engine dispatch ----
 
 function dispatch(ev: EngineEvent) {
+  if (ROLE !== 'dm') return; // Player window is read-only.
   if (!state || !currentCaseId) return;
   const caseFile = cases[currentCaseId];
   if (!caseFile) return;
@@ -344,12 +526,13 @@ function dispatch(ev: EngineEvent) {
   if (result.outcomes.length > 0) {
     showOutcome(result.outcomes.join('\n\n'));
   }
-  // After a turn-ending event the active room becomes null. Reset turn timer.
-  if (state.activeRoom === null && (ev.kind === 'commit_dispo' || ev.kind === 'exit_room')) {
+  // Wall-clock timer resets when a turn advances (end_turn or dispo).
+  if (ev.kind === 'end_turn' || ev.kind === 'commit_dispo') {
     snapshots.push(state);
     resetTurnTimer();
   }
   renderAll();
+  broadcastState();
 }
 
 function pushCues(cues: DmCue[]) {
@@ -383,7 +566,7 @@ function pushCues(cues: DmCue[]) {
         break;
       }
       case 'tier_change': {
-        text = `Patient ${patient?.id ?? c.patientId}: manifest tier ${c.from} → ${c.to}`;
+        text = `Patient ${patient?.id ?? c.patientId}: acuity tier ${c.from} → ${c.to}`;
         tag = 'tier';
         break;
       }
@@ -428,6 +611,7 @@ function renderAll() {
   renderRoom();
   renderInbox();
   renderCues();
+  if (dmBriefOpen && ROLE === 'dm') renderDmBrief();
 }
 
 function renderTopbar() {
@@ -491,8 +675,8 @@ function renderFloor() {
       // Tier bar
       const barY = r.y + r.h - 10;
       const fullW = r.w - 16;
-      const tierW = ((p.manifestTier + 1) / 4) * fullW;
-      html += `<line class="tier-bar t${p.manifestTier}" x1="${r.x + 8}" y1="${barY}" x2="${r.x + 8 + tierW}" y2="${barY}" />`;
+      const tierW = ((p.acuityTier + 1) / 4) * fullW;
+      html += `<line class="tier-bar t${p.acuityTier}" x1="${r.x + 8}" y1="${barY}" x2="${r.x + 8 + tierW}" y2="${barY}" />`;
     }
     if (r.facility) {
       const queue = state.facilityLoad[r.facility as keyof typeof state.facilityLoad];
@@ -541,11 +725,12 @@ function renderRoom() {
     `${caseFile.demographics.age}${caseFile.demographics.sex} · ${caseFile.title}`;
   document.getElementById('patient-cc')!.textContent = `Chief complaint: ${caseFile.chief_complaint}`;
 
-  // Manifest fill
-  const fill = document.getElementById('manifest-fill')!;
-  const pct = ((patient.manifestTier + 1) / 4) * 100;
+  // Acuity fill + tier label
+  const fill = document.getElementById('acuity-fill')!;
+  const pct = ((patient.acuityTier + 1) / 4) * 100;
   fill.style.width = `${pct}%`;
-  fill.className = `manifest-fill t${patient.manifestTier}`;
+  fill.className = `acuity-fill t${patient.acuityTier}`;
+  document.getElementById('acuity-label')!.textContent = acuityLabel(patient.acuityTier);
 
   renderVitals(patient.vitalsCurrent);
   renderBudget();
@@ -555,21 +740,23 @@ function renderRoom() {
 function renderVitals(v: Vitals) {
   const box = document.getElementById('vitals-box')!;
   const items = [
-    { lbl: 'HR', val: v.hr, unit: 'bpm', alert: v.hr > 110 || v.hr < 50, crit: v.hr > 140 || v.hr < 40 },
+    { lbl: 'HR', val: String(Math.round(v.hr)), unit: 'bpm', alert: v.hr > 110 || v.hr < 50, crit: v.hr > 140 || v.hr < 40 },
     { lbl: 'BP', val: `${Math.round(v.sbp)}/${Math.round(v.dbp)}`, unit: 'mmHg', alert: v.sbp < 100 || v.sbp > 160, crit: v.sbp < 90 },
-    { lbl: 'RR', val: Math.round(v.rr), unit: '/min', alert: v.rr > 22 || v.rr < 10, crit: v.rr > 28 || v.rr < 8 },
+    { lbl: 'RR', val: String(Math.round(v.rr)), unit: '/min', alert: v.rr > 22 || v.rr < 10, crit: v.rr > 28 || v.rr < 8 },
     { lbl: 'SpO₂', val: `${Math.round(v.spo2)}%`, unit: '', alert: v.spo2 < 94, crit: v.spo2 < 90 },
     { lbl: 'Temp', val: v.tempC.toFixed(1), unit: '°C', alert: v.tempC >= 38 || v.tempC < 36, crit: v.tempC >= 39.5 || v.tempC < 35 },
-    { lbl: 'Tier', val: `${0 + 1 * 0}`, unit: '', alert: false, crit: false },
   ];
-  // Replace the placeholder Tier with manifest tier numeric for clarity (kept for symmetry).
-  items[5] = { lbl: 'Tier', val: '—', unit: '', alert: false, crit: false };
   box.innerHTML = items
     .map((it) => {
       const cls = it.crit ? 'vital crit' : it.alert ? 'vital alert' : 'vital';
       return `<div class="${cls}"><span class="lbl">${it.lbl}</span><span class="val">${it.val}<small style="font-size:11px;color:var(--ink-muted);margin-left:3px">${it.unit}</small></span></div>`;
     })
     .join('');
+}
+
+function acuityLabel(tier: number): string {
+  const names = ['Tier 0 · stable', 'Tier 1 · drifting', 'Tier 2 · deteriorating', 'Tier 3 · critical'];
+  return names[Math.max(0, Math.min(3, tier))]!;
 }
 
 function renderBudget() {
@@ -584,27 +771,32 @@ function renderBudget() {
 }
 
 function renderActionPane(caseFile: CaseFile, patient: Patient) {
+  const budget = state?.withinTurnBudget ?? 0;
+  const noBudget = budget <= 0;
+
   const paneH = document.getElementById('pane-history')!;
-  paneH.innerHTML = `<div class="action-list">${caseFile.history_items
-    .map((h) => actionBtn(h.id, h.label, h.cost, patient.historyAsked.includes(h.id)))
+  paneH.innerHTML = `${noBudget ? budgetHint() : ''}<div class="action-list">${caseFile.history_items
+    .map((h) => actionBtn(h.id, h.label, h.cost, patient.historyAsked.includes(h.id), noBudget || h.cost > budget))
     .join('')}</div>`;
   paneH.querySelectorAll<HTMLButtonElement>('.action-btn').forEach((btn) => {
+    if (btn.disabled) return;
     btn.addEventListener('click', () => dispatch({ kind: 'ask_history', itemId: btn.dataset.id! }));
   });
 
   const paneE = document.getElementById('pane-exam')!;
-  paneE.innerHTML = `<div class="action-list">${caseFile.exam_regions
-    .map((r) => actionBtn(r.id, r.label, r.cost, patient.examsPerformed.includes(r.id)))
+  paneE.innerHTML = `${noBudget ? budgetHint() : ''}<div class="action-list">${caseFile.exam_regions
+    .map((r) => actionBtn(r.id, r.label, r.cost, patient.examsPerformed.includes(r.id), noBudget || r.cost > budget))
     .join('')}</div>`;
   paneE.querySelectorAll<HTMLButtonElement>('.action-btn').forEach((btn) => {
+    if (btn.disabled) return;
     btn.addEventListener('click', () => dispatch({ kind: 'exam_region', regionId: btn.dataset.id! }));
   });
 
   const paneO = document.getElementById('pane-orders')!;
-  paneO.innerHTML = `<div class="action-list">${caseFile.orders_available
+  paneO.innerHTML = `${noBudget ? budgetHint() : ''}<div class="action-list">${caseFile.orders_available
     .map((o) => {
       const blocked = Boolean(o.after_order && !patient.ordersPlaced.includes(o.after_order));
-      return actionBtn(o.order_id, prettyOrder(o.order_id), 1, patient.ordersPlaced.includes(o.order_id), blocked);
+      return actionBtn(o.order_id, prettyOrder(o.order_id), 1, patient.ordersPlaced.includes(o.order_id), blocked || noBudget);
     })
     .join('')}</div>`;
   paneO.querySelectorAll<HTMLButtonElement>('.action-btn').forEach((btn) => {
@@ -622,10 +814,11 @@ function renderActionPane(caseFile: CaseFile, patient: Patient) {
     { id: 'morphine_4_iv', label: 'Morphine 4mg IV' },
   ];
   const paneM = document.getElementById('pane-meds')!;
-  paneM.innerHTML = `<div class="action-list">${meds
-    .map((m) => actionBtn(m.id, m.label, 1, patient.medsGiven.includes(m.id)))
+  paneM.innerHTML = `${noBudget ? budgetHint() : ''}<div class="action-list">${meds
+    .map((m) => actionBtn(m.id, m.label, 1, patient.medsGiven.includes(m.id), noBudget))
     .join('')}</div>`;
   paneM.querySelectorAll<HTMLButtonElement>('.action-btn').forEach((btn) => {
+    if (btn.disabled) return;
     btn.addEventListener('click', () => dispatch({ kind: 'give_med', medId: btn.dataset.id! }));
   });
 
@@ -651,6 +844,10 @@ function actionBtn(id: string, label: string, cost: number, done: boolean, disab
     <span class="lbl">${escape(label)}</span>
     <span class="cost">${cost}u</span>
   </button>`;
+}
+
+function budgetHint(): string {
+  return `<div class="budget-hint">Out of time this turn — hit <strong>End turn</strong> to advance the clock.</div>`;
 }
 
 function dispoBtn(dispo: string, name: string, desc: string) {
