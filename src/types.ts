@@ -64,12 +64,15 @@ export type ActionLogEntry = {
 };
 
 export type GameState = {
-  caseId: string;
+  caseId: string; // first / lead-in case id, kept for ref
   seed: number;
   rngCursor: number;
   shiftClockMin: number;
   paused: boolean;
   patients: Patient[];
+  patientQueue: string[]; // case_ids waiting to arrive
+  nextArrivalTurn: number;
+  patientCounter: number; // monotonic id source
   pendingOrders: PendingOrder[];
   resolvedOrders: ResolvedOrder[];
   facilityLoad: FacilityLoad;
@@ -82,6 +85,9 @@ export type GameState = {
     turnTickMinutes: number;
     withinTurnBudgetMax: number;
     loadFactor: number;
+    arrivalEveryTurns: number;
+    maxActivePatients: number;
+    bayPool: string[];
   };
 };
 

@@ -73,7 +73,7 @@ function populateCaseSelect() {
   for (const c of Object.values(cases).sort((a, b) => a.title.localeCompare(b.title))) {
     const opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = `${c.title}${c.kind === 'mook' ? ' · simple' : ''}`;
+    opt.textContent = c.title; // no kind tag — keeps the picker safe to mirror
     sel.append(opt);
   }
   sel.addEventListener('change', () => {
@@ -243,11 +243,36 @@ function broadcastState() {
 // ---- DM brief (reveal panel: hidden truth, trajectory, pre-revealed results, dispo previews) ----
 
 function renderDmBrief() {
-  if (!state || !currentCaseId) return;
-  const caseFile = cases[currentCaseId];
-  if (!caseFile) return;
+  if (!state) return;
   const body = document.getElementById('dm-brief-body')!;
-  const patient = state.patients[0]!;
+  const active = state.patients.filter((p) => !p.dispoCommitted);
+  if (active.length === 0) {
+    body.innerHTML = '<div style="color:#8a6b3a"><em>No active patients.</em></div>';
+    return;
+  }
+  // Render a section per active patient, with the focused one expanded first
+  const focused = state.activePatientId;
+  const ordered = [
+    ...active.filter((p) => p.id === focused),
+    ...active.filter((p) => p.id !== focused),
+  ];
+  const upcoming = state.patientQueue
+    .slice(0, 6)
+    .map((id) => cases[id])
+    .filter((c): c is CaseFile => Boolean(c));
+
+  body.innerHTML = ordered.map((p) => renderDmPatientSection(p, p.id === focused)).join('') +
+    (upcoming.length > 0
+      ? `<div class="dm-section">
+          <div class="dm-section-h">Up next in the queue</div>
+          ${upcoming.map((c) => `<div class="dm-order-row"><div class="dm-order-name">${escape(c.title)}</div><div class="dm-order-meta">${escape(c.chief_complaint)}</div></div>`).join('')}
+        </div>`
+      : '');
+}
+
+function renderDmPatientSection(patient: Patient, isFocused: boolean): string {
+  const caseFile = cases[patient.caseRef];
+  if (!caseFile || !state) return '';
   const dx = patient.hiddenDx;
 
   const drawWeights = caseFile.hidden_dx_draw;
@@ -281,10 +306,11 @@ function renderDmBrief() {
     })
     .join('');
 
-  // Pending order pre-reveals
-  const pendingHtml = state.pendingOrders.length === 0
-    ? '<div class="dm-order-row" style="color:#8a6b3a">No pending orders.</div>'
-    : state.pendingOrders
+  // Pending order pre-reveals — scoped to this patient
+  const myPending = state.pendingOrders.filter((po) => po.patientId === patient.id);
+  const pendingHtml = myPending.length === 0
+    ? '<div class="dm-order-row" style="color:#8a6b3a">No pending orders for this patient.</div>'
+    : myPending
         .map((p) => {
           const cat = caseFile.orders_available.find((o) => o.order_id === p.orderId);
           const result = cat?.result_by_dx[dx];
@@ -320,28 +346,36 @@ function renderDmBrief() {
     })
     .join('');
 
-  body.innerHTML = `
-    <div class="dm-section">
-      <div class="dm-section-h">Hidden truth</div>
-      <div class="dm-truth">${escape(dx)}
-        <div class="dm-truth-meta">rolled at start · weight ${drawWeight} / ${totalWeight} (${drawPct}%)</div>
+  return `
+    <div class="dm-patient ${isFocused ? 'focused' : ''}">
+      <div class="dm-patient-h">
+        <span class="dm-patient-id">${escape(patient.id)}</span>
+        <span class="dm-patient-loc">${escape(roomLabel(patient.room))}</span>
+        <span class="dm-patient-cc">${escape(caseFile.demographics.age + caseFile.demographics.sex + ' · ' + caseFile.chief_complaint)}</span>
+        ${isFocused ? '<span class="dm-patient-focus">FOCUSED</span>' : ''}
       </div>
-    </div>
-    <div class="dm-section">
-      <div class="dm-section-h">Acuity trajectory (current tier ${patient.acuityTier})</div>
-      ${trajRows || '<div style="color:#8a6b3a"><em>no trajectory authored</em></div>'}
-    </div>
-    <div class="dm-section">
-      <div class="dm-section-h">Pending orders — pre-revealed</div>
-      ${pendingHtml}
-    </div>
-    <div class="dm-section">
-      <div class="dm-section-h">Other available orders — what each would return</div>
-      ${unplacedHtml || '<div style="color:#8a6b3a">All available orders already placed.</div>'}
-    </div>
-    <div class="dm-section">
-      <div class="dm-section-h">Dispo outcomes — preview at current tier</div>
-      ${dispoHtml || '<div style="color:#8a6b3a"><em>no outcomes authored</em></div>'}
+      <div class="dm-section">
+        <div class="dm-section-h">Hidden truth</div>
+        <div class="dm-truth">${escape(dx)}
+          <div class="dm-truth-meta">rolled · weight ${drawWeight} / ${totalWeight} (${drawPct}%)</div>
+        </div>
+      </div>
+      <div class="dm-section">
+        <div class="dm-section-h">Acuity trajectory (currently tier ${patient.acuityTier})</div>
+        ${trajRows || '<div style="color:#8a6b3a"><em>no trajectory authored</em></div>'}
+      </div>
+      <div class="dm-section">
+        <div class="dm-section-h">Pending orders — pre-revealed</div>
+        ${pendingHtml}
+      </div>
+      <div class="dm-section">
+        <div class="dm-section-h">Other available orders — what each would return</div>
+        ${unplacedHtml || '<div style="color:#8a6b3a">All available orders already placed.</div>'}
+      </div>
+      <div class="dm-section">
+        <div class="dm-section-h">Dispo outcomes — preview at current tier</div>
+        ${dispoHtml || '<div style="color:#8a6b3a"><em>no outcomes authored</em></div>'}
+      </div>
     </div>
   `;
 }
@@ -502,7 +536,7 @@ function startNewGame() {
   const caseFile = cases[currentCaseId];
   if (!caseFile) return;
   const seed = (Date.now() ^ Math.floor(Math.random() * 1_000_000)) >>> 0;
-  const result = newGame(caseFile, seed);
+  const result = newGame(caseFile, cases, seed);
   state = result.state;
   snapshots = new SnapshotBuffer(30);
   snapshots.push(state);
@@ -518,9 +552,7 @@ function startNewGame() {
 function dispatch(ev: EngineEvent) {
   if (ROLE !== 'dm') return; // Player window is read-only.
   if (!state || !currentCaseId) return;
-  const caseFile = cases[currentCaseId];
-  if (!caseFile) return;
-  const result = applyEvent(state, caseFile, ev);
+  const result = applyEvent(state, cases, ev);
   state = result.state;
   pushCues(result.cues);
   if (result.outcomes.length > 0) {
@@ -540,41 +572,52 @@ function pushCues(cues: DmCue[]) {
   for (const c of cues) {
     let tag: string = c.kind;
     let text = '';
-    const patient = state.patients.find((p) => p.id === c.patientId);
-    const caseFile = currentCaseId ? cases[currentCaseId] : null;
-    switch (c.kind) {
-      case 'history': {
-        const item = caseFile?.history_items.find((h) => h.id === c.itemId);
-        text = `Voice the patient's answer to: "${item?.label ?? c.itemId}"`;
-        tag = 'DM';
-        break;
+    if ('patientId' in c) {
+      const patient = state.patients.find((p) => p.id === c.patientId);
+      const caseFile = patient ? cases[patient.caseRef] : null;
+      switch (c.kind) {
+        case 'history': {
+          const item = caseFile?.history_items.find((h) => h.id === c.itemId);
+          text = `Voice the patient's answer to: "${item?.label ?? c.itemId}"`;
+          tag = 'DM';
+          break;
+        }
+        case 'exam': {
+          const region = caseFile?.exam_regions.find((r) => r.id === c.regionId);
+          text = `Voice the exam finding for: ${region?.label ?? c.regionId}`;
+          tag = 'DM';
+          break;
+        }
+        case 'order_placed': {
+          text = `Order placed: ${prettyOrder(c.orderId)} (resolves turn ${c.resolvesTurn})`;
+          tag = 'order';
+          break;
+        }
+        case 'order_result': {
+          text = `Result: ${prettyOrder(c.orderId)} → ${c.text}`;
+          tag = 'result';
+          break;
+        }
+        case 'tier_change': {
+          text = `${patient?.id ?? c.patientId}: acuity tier ${c.from} → ${c.to}`;
+          tag = 'tier';
+          break;
+        }
+        case 'budget_exhausted': {
+          text = `Time in room exhausted — hit End turn to advance.`;
+          tag = 'time';
+          break;
+        }
+        case 'arrival': {
+          const cf = cases[c.caseRef];
+          text = `New patient arrived in ${roomLabel(c.room)}: ${cf?.chief_complaint ?? c.caseRef}`;
+          tag = 'arrival';
+          break;
+        }
       }
-      case 'exam': {
-        const region = caseFile?.exam_regions.find((r) => r.id === c.regionId);
-        text = `Voice the exam finding for: ${region?.label ?? c.regionId}`;
-        tag = 'DM';
-        break;
-      }
-      case 'order_placed': {
-        text = `Order placed: ${c.orderId} (resolves at turn ${c.resolvesTurn})`;
-        tag = 'order';
-        break;
-      }
-      case 'order_result': {
-        text = `Result: ${c.orderId} → ${c.text}`;
-        tag = 'result';
-        break;
-      }
-      case 'tier_change': {
-        text = `Patient ${patient?.id ?? c.patientId}: acuity tier ${c.from} → ${c.to}`;
-        tag = 'tier';
-        break;
-      }
-      case 'budget_exhausted': {
-        text = `Time in room exhausted — turn ends.`;
-        tag = 'time';
-        break;
-      }
+    } else if (c.kind === 'shift_end') {
+      text = `Shift ending — 7:30 PM. No more arrivals.`;
+      tag = 'shift';
     }
     dmCues.unshift({ tag, text, turn: state.turnIx });
   }
@@ -617,10 +660,13 @@ function renderAll() {
 function renderTopbar() {
   if (!state) return;
   const sc = document.getElementById('shift-clock')!;
-  const mins = state.shiftClockMin;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  sc.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  // Shift starts at 7:30 AM, runs to 7:30 PM. Display 12-hour clock.
+  const totalMin = 7 * 60 + 30 + state.shiftClockMin;
+  const h24 = Math.floor(totalMin / 60) % 24;
+  const m = totalMin % 60;
+  const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  sc.textContent = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
   document.getElementById('turn-timer')!.textContent = String(turnSecondsRemaining);
   const pb = document.getElementById('pause-btn')!;
   pb.textContent = state.paused ? 'Resume' : 'Pause';
@@ -671,7 +717,12 @@ function renderFloor() {
     html += `<text class="${r.facility ? 'facility-label' : 'room-label'}" x="${r.x + 8}" y="${r.y + 16}">${r.label}</text>`;
     if (has.length > 0) {
       const p = has[0]!;
-      html += `<text class="room-occupant" x="${r.x + 8}" y="${r.y + 32}">${escape(p.caseRef.replace(/_/g, ' '))}</text>`;
+      // Player-safe room label: chief complaint, never the case id (which would leak the camouflaged dx)
+      const cf = cases[p.caseRef];
+      const label = cf
+        ? `${cf.demographics.age}${cf.demographics.sex} · ${truncate(cf.chief_complaint, 28)}`
+        : '';
+      html += `<text class="room-occupant" x="${r.x + 8}" y="${r.y + 32}">${escape(label)}</text>`;
       // Tier bar
       const barY = r.y + r.h - 10;
       const fullW = r.w - 16;
@@ -702,9 +753,7 @@ function renderFloor() {
 }
 
 function renderRoom() {
-  if (!state || !currentCaseId) return;
-  const caseFile = cases[currentCaseId];
-  if (!caseFile) return;
+  if (!state) return;
   const room = state.activeRoom;
   const empty = document.getElementById('room-empty')!;
   const body = document.getElementById('room-body')!;
@@ -717,12 +766,14 @@ function renderRoom() {
   const activeId = state.activePatientId;
   const patient = state.patients.find((p) => p.id === activeId);
   if (!patient) return;
+  const caseFile = cases[patient.caseRef];
+  if (!caseFile) return;
 
   empty.hidden = true;
   body.hidden = false;
-  document.getElementById('room-title')!.textContent = roomLabel(room);
+  document.getElementById('room-title')!.textContent = `${roomLabel(room)} · ${truncate(caseFile.chief_complaint, 40)}`;
   document.getElementById('patient-name')!.textContent =
-    `${caseFile.demographics.age}${caseFile.demographics.sex} · ${caseFile.title}`;
+    `${caseFile.demographics.age}${caseFile.demographics.sex}`;
   document.getElementById('patient-cc')!.textContent = `Chief complaint: ${caseFile.chief_complaint}`;
 
   // Acuity fill + tier label
@@ -770,7 +821,7 @@ function renderBudget() {
   bf.style.background = remaining < 3 ? 'var(--bad)' : remaining < 5 ? 'var(--warn)' : 'var(--accent)';
 }
 
-function renderActionPane(caseFile: CaseFile, patient: Patient) {
+function renderActionPane(caseFile: CaseFile, patient: Patient): void {
   const budget = state?.withinTurnBudget ?? 0;
   const noBudget = budget <= 0;
 
@@ -858,9 +909,11 @@ function dispoBtn(dispo: string, name: string, desc: string) {
 }
 
 function renderInbox() {
-  if (!state || !currentCaseId) return;
-  const caseFile = cases[currentCaseId];
-  if (!caseFile) return;
+  if (!state) return;
+  const patientLabel = (id: string): string => {
+    const p = state!.patients.find((q) => q.id === id);
+    return p ? roomLabel(p.room) : id;
+  };
   const results = document.getElementById('results-list')!;
   if (state.resolvedOrders.length === 0) {
     results.innerHTML = '<div class="empty-state" style="padding:14px">No results yet.</div>';
@@ -871,7 +924,7 @@ function renderInbox() {
       .map(
         (r) => `
         <div class="result-item">
-          <div class="result-h">${prettyOrder(r.orderId)}<span class="when">turn ${r.resolvedTurn}</span></div>
+          <div class="result-h">${prettyOrder(r.orderId)}<span class="when">${escape(patientLabel(r.patientId))} · turn ${r.resolvedTurn}</span></div>
           <div>${escape(r.resultText)}</div>
         </div>`,
       )
@@ -884,13 +937,11 @@ function renderInbox() {
     pending.innerHTML = state.pendingOrders
       .map(
         (p) => `<div class="pending-item">
-          <div class="result-h">${prettyOrder(p.orderId)}<span class="when">resolves turn ${p.resolvesTurn}</span></div>
+          <div class="result-h">${prettyOrder(p.orderId)}<span class="when">${escape(patientLabel(p.patientId))} · resolves turn ${p.resolvesTurn}</span></div>
         </div>`,
       )
       .join('');
   }
-  // Touch caseFile to silence unused warnings — used elsewhere
-  void caseFile;
 }
 
 function renderCues() {
@@ -953,6 +1004,11 @@ function prettyOrder(orderId: string): string {
     blood_culture: 'Blood culture x2',
   };
   return map[orderId] ?? orderId;
+}
+
+function truncate(s: string, n: number): string {
+  if (s.length <= n) return s;
+  return s.slice(0, n - 1).trimEnd() + '…';
 }
 
 function escape(s: string): string {
