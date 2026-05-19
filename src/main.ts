@@ -386,7 +386,7 @@ function signed(n: number): string {
 
 // ---- Resize gutters (meridian-os-borrowed bubble visual, gutter mechanic) ----
 
-const LAYOUT_KEY = 'fulcrum.layout.v1';
+const LAYOUT_KEY = `fulcrum.layout.${ROLE}.v1`;
 type LayoutKey = 'floor' | 'room' | 'right' | 'inbox' | 'log';
 
 function setupResizeGutters() {
@@ -910,38 +910,59 @@ function dispoBtn(dispo: string, name: string, desc: string) {
 
 function renderInbox() {
   if (!state) return;
-  const patientLabel = (id: string): string => {
-    const p = state!.patients.find((q) => q.id === id);
-    return p ? roomLabel(p.room) : id;
-  };
+  const activeId = state.activePatientId;
+
+  // Most recent first within each patient's group.
+  const resultsByPatient = new Map<string, string[]>();
+  for (const r of state.resolvedOrders.slice().reverse()) {
+    const row = `<div class="result-item">
+      <div class="result-h">${prettyOrder(r.orderId)}<span class="when">turn ${r.resolvedTurn}</span></div>
+      <div>${escape(r.resultText)}</div>
+    </div>`;
+    const arr = resultsByPatient.get(r.patientId) ?? [];
+    arr.push(row);
+    resultsByPatient.set(r.patientId, arr);
+  }
+
+  const pendingByPatient = new Map<string, string[]>();
+  for (const p of state.pendingOrders) {
+    const row = `<div class="pending-item">
+      <div class="result-h">${prettyOrder(p.orderId)}<span class="when">resolves turn ${p.resolvesTurn}</span></div>
+    </div>`;
+    const arr = pendingByPatient.get(p.patientId) ?? [];
+    arr.push(row);
+    pendingByPatient.set(p.patientId, arr);
+  }
+
+  const renderGroups = (rowsByPatient: Map<string, string[]>): string =>
+    state!.patients
+      .map((p) => {
+        const rows = rowsByPatient.get(p.id);
+        if (!rows || rows.length === 0) return '';
+        const active = p.id === activeId ? ' is-active' : '';
+        return `<div class="bay-group${active}">
+          <div class="bay-group-h">${escape(patientHeader(p))}</div>
+          ${rows.join('')}
+        </div>`;
+      })
+      .join('');
+
   const results = document.getElementById('results-list')!;
-  if (state.resolvedOrders.length === 0) {
-    results.innerHTML = '<div class="empty-state" style="padding:14px">No results yet.</div>';
-  } else {
-    results.innerHTML = state.resolvedOrders
-      .slice()
-      .reverse()
-      .map(
-        (r) => `
-        <div class="result-item">
-          <div class="result-h">${prettyOrder(r.orderId)}<span class="when">${escape(patientLabel(r.patientId))} · turn ${r.resolvedTurn}</span></div>
-          <div>${escape(r.resultText)}</div>
-        </div>`,
-      )
-      .join('');
-  }
+  const resultsHtml = renderGroups(resultsByPatient);
+  results.innerHTML = resultsHtml || '<div class="empty-state" style="padding:14px">No results yet.</div>';
+
   const pending = document.getElementById('pending-list')!;
-  if (state.pendingOrders.length === 0) {
-    pending.innerHTML = '<div class="empty-state" style="padding:14px">Nothing pending.</div>';
-  } else {
-    pending.innerHTML = state.pendingOrders
-      .map(
-        (p) => `<div class="pending-item">
-          <div class="result-h">${prettyOrder(p.orderId)}<span class="when">${escape(patientLabel(p.patientId))} · resolves turn ${p.resolvesTurn}</span></div>
-        </div>`,
-      )
-      .join('');
-  }
+  const pendingHtml = renderGroups(pendingByPatient);
+  pending.innerHTML = pendingHtml || '<div class="empty-state" style="padding:14px">Nothing pending.</div>';
+}
+
+function patientHeader(p: Patient): string {
+  const cf = cases[p.caseRef];
+  const demo = cf ? `${cf.demographics.age}${cf.demographics.sex}` : '';
+  const cc = cf ? truncate(cf.chief_complaint, 36) : '';
+  const dispo = p.dispoCommitted ? ' · discharged' : '';
+  const parts = [roomLabel(p.room), demo, cc].filter(Boolean);
+  return `${parts.join(' · ')}${dispo}`;
 }
 
 function renderCues() {

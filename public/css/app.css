@@ -272,11 +272,24 @@ button { font: inherit; }
   flex: 1; overflow: auto; padding: 8px 12px;
   font-size: 13px;
 }
+.results-list, .pending-list { padding: 4px 0; }
+.cues-list { padding: 8px 12px; }
 .result-item, .pending-item, .cue-item {
   padding: 6px 0;
   border-bottom: 1px dashed var(--line);
 }
 .result-item:last-child, .pending-item:last-child, .cue-item:last-child { border-bottom: 0; }
+
+.bay-group { padding: 6px 12px 8px; }
+.bay-group + .bay-group { border-top: 1px solid var(--line); }
+.bay-group-h {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--slate); font-weight: 600;
+  padding: 4px 0 6px;
+}
+.bay-group .result-item,
+.bay-group .pending-item { padding: 4px 0; }
+.bay-group.is-active .bay-group-h { color: var(--accent); }
 .result-h { color: var(--slate); font-weight: 600; font-size: 12px; margin-bottom: 2px; }
 .result-h .when { color: var(--ink-muted); font-weight: 400; margin-left: 6px; font-size: 11px; }
 .cue-item.dm-cue { background: #fdf6e6; border-left: 3px solid var(--warn); padding-left: 8px; border-bottom: 0; margin-bottom: 4px; border-radius: 0 4px 4px 0; }
@@ -419,9 +432,36 @@ body.role-player .dispo-btn,
 body.role-player #exit-room { display: none; }
 body.role-player .case-pick { pointer-events: none; opacity: 0.7; }
 body.role-player .room-rect { cursor: default !important; }
+
+/* DM-only panels + dead UI (empty tab strip) — hidden from the player. */
+body.role-player .log,
+body.role-player .action-tabs,
+body.role-player .tab-pane,
+body.role-player .room-foot { display: none; }
+
+/* ---- Player mode layout ----
+   2-col grid: large floor on the left, room-view stacked above results+pending on the right.
+   Drag handle between them re-enables the floor↔right resize; the other two gutters stay hidden.
+   The drag handler writes unitless numbers to --flex-floor / --flex-room on <html>'s inline style,
+   which calc(<num> * 1fr) consumes as valid grid tracks. Defaults live inside var() fallbacks so
+   they don't shadow the drag handler's writes via a closer-ancestor body-level declaration. */
+body.role-player .layout {
+  display: grid;
+  grid-template-columns:
+    minmax(0, calc(var(--flex-floor, 2.5) * 1fr))
+    14px
+    minmax(0, calc(var(--flex-room, 1.0) * 1fr));
+  grid-template-rows: 1.4fr 1fr;
+  column-gap: 0;
+  row-gap: 14px;
+}
+body.role-player .floor-plan  { grid-column: 1; grid-row: 1 / span 2; }
+body.role-player .room-view   { grid-column: 3; grid-row: 1; }
+body.role-player .right-stack { grid-column: 3; grid-row: 2; }
 body.role-player .gutter { display: none; }
-body.role-player .layout > * + .pane { margin-left: 14px; }
-body.role-player .right-stack > .card + .card { margin-top: 14px; }
+body.role-player .gutter[data-handle="floor-room"] {
+  display: flex; grid-column: 2; grid-row: 1 / span 2;
+}
 body.role-player::after {
   content: 'Player view — read-only mirror';
   position: fixed; bottom: 8px; right: 12px;
