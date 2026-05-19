@@ -436,12 +436,11 @@ function startGutterDrag(g: HTMLDivElement, e: PointerEvent) {
   const minPx = 120;
 
   g.classList.add('is-active');
-  try {
-    g.setPointerCapture(e.pointerId);
-  } catch {
-    /* ignore */
-  }
 
+  // Attach move/up to the document, not the gutter — the 14px gutter strip is too
+  // narrow to reliably hold pointer capture under grid layout, so a cursor slipping
+  // outside it would silently stop firing pointermove. Document-level listeners
+  // sidestep capture entirely.
   const onMove = (ev: PointerEvent) => {
     const cur = axis === 'v' ? ev.clientX : ev.clientY;
     const delta = cur - startPos;
@@ -454,15 +453,15 @@ function startGutterDrag(g: HTMLDivElement, e: PointerEvent) {
 
   const onUp = () => {
     g.classList.remove('is-active');
-    g.removeEventListener('pointermove', onMove);
-    g.removeEventListener('pointerup', onUp);
-    g.removeEventListener('pointercancel', onUp);
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onUp);
     saveLayout();
   };
 
-  g.addEventListener('pointermove', onMove);
-  g.addEventListener('pointerup', onUp);
-  g.addEventListener('pointercancel', onUp);
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
 }
 
 function paneRefsForHandle(
